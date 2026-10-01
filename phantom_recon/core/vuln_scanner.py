@@ -105,6 +105,18 @@ SECURITY_HEADERS = {
         "description": "Permissions-Policy header is missing; browser hardware APIs (camera, mic, geolocation) are unrestricted.",
         "remediation": "Add a restrictive Permissions-Policy header (e.g. camera=(), microphone=(), geolocation=()).",
     },
+    "Cross-Origin-Opener-Policy": {
+        "severity": "low",
+        "cvss": 3.1,
+        "description": "Cross-Origin-Opener-Policy (COOP) header is absent, allowing cross-origin window interaction and Spectre-based leaks.",
+        "remediation": "Add 'Cross-Origin-Opener-Policy: same-origin' header.",
+    },
+    "Cross-Origin-Embedder-Policy": {
+        "severity": "low",
+        "cvss": 3.1,
+        "description": "Cross-Origin-Embedder-Policy (COEP) header is absent, allowing unconstrained cross-origin resource embedding.",
+        "remediation": "Add 'Cross-Origin-Embedder-Policy: require-corp' header.",
+    },
 }
 
 # Sensitive file probes with strict semantic content validators (No False Positives)
@@ -120,6 +132,17 @@ SENSITIVE_FILES_DATABASE = [
         "must_not_contain": ["<!DOCTYPE html", "<html", "<head", "<body", "404 Not Found"],
         "description": "Publicly readable environment variables file containing credentials, database secrets, or API keys.",
         "remediation": "Configure web server (Nginx/Apache) to deny public HTTP access to hidden dotfiles like .env.",
+    },
+    {
+        "path": "/backup.sql",
+        "title": "Exposed Database SQL Dump (backup.sql)",
+        "severity": "critical",
+        "cvss": 9.8,
+        "category": "sensitive_data",
+        "regex": r"(?m)^(CREATE TABLE|INSERT INTO|-- MySQL dump|-- PostgreSQL database dump)",
+        "must_not_contain": ["<!DOCTYPE html", "<html", "<head", "<body"],
+        "description": "Publicly accessible raw database dump file exposing sensitive schemas, table structures, and stored credentials.",
+        "remediation": "Remove backup files from document root and store securely outside public server directories.",
     },
     {
         "path": "/.git/HEAD",
@@ -164,6 +187,17 @@ SENSITIVE_FILES_DATABASE = [
         "must_not_contain": ["404 Not Found", "Page Not Found"],
         "description": "Apache server-status page publicly exposes active client requests, client IP addresses, and performance metrics.",
         "remediation": "Restrict /server-status access to localhost in Apache configuration.",
+    },
+    {
+        "path": "/.DS_Store",
+        "title": "Exposed Apple macOS Directory Metadata (.DS_Store)",
+        "severity": "medium",
+        "cvss": 5.3,
+        "category": "info_disclosure",
+        "regex": r"(\x00\x00\x00\x01Bud1|Bud1)",
+        "must_not_contain": ["<!DOCTYPE html", "<html", "<head"],
+        "description": "macOS .DS_Store file reveals private file system hierarchy, hidden file names, and directories.",
+        "remediation": "Configure web server to deny access to .DS_Store files and add to .gitignore.",
     },
 ]
 
@@ -504,6 +538,68 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_directory_listing(self) -> list[Vulnerability]:
+        """
+        Zero False-Positive Directory Listing / Indexing audit.
+        Checks common asset folders (/uploads/, /static/, /assets/, /backup/, /files/, /images/)
+        against genuine directory indexing signatures.
+        """
+        logger.info("Auditing common directories for insecure directory listing...")
+        self.profile_404_baseline()
+        vulns = []
+        candidate_dirs = ["/uploads/", "/static/", "/assets/", "/backup/", "/files/", "/images/"]
+
+        # Real web server index signatures (Apache, Nginx, IIS, Lighttpd, Python)
+        index_signatures = [
+            r"<title>Index of /",
+            r"<title>Directory Listing -- /",
+            r"<h2>Directory listing for /",
+            r"<pre><a href=\"\.\./\">",
+            r"\[To Parent Directory\]",
+        ]
+
+        for d in candidate_dirs:
+            target_url = urljoin(self.url + "/", d.lstrip("/"))
+            try:
+                resp = self.session.get(target_url, timeout=self.timeout, allow_redirects=False)
+                if resp.status_code != 200:
+                    continue
+                if self._is_soft_404(resp):
+                    continue
+
+                text = resp.text[:4000]
+                matched_sig = None
+                for sig in index_signatures:
+                    if re.search(sig, text, re.IGNORECASE):
+                        matched_sig = sig
+                        break
+
+                if matched_sig:
+                    vuln = Vulnerability(
+                        title=f"Insecure Directory Listing Enabled on '{d}'",
+                        severity="medium",
+                        cvss_score=5.3,
+                        description=(
+                            f"The directory '{d}' has directory browsing/listing enabled. "
+                            "Unauthenticated users can enumerate uploaded files, scripts, and private assets."
+                        ),
+                        location=f"Web Directory: {d}",
+                        url=self.url,
+                        poc_url=target_url,
+                        reproduce_curl=f"curl -i -k '{target_url}'",
+                        evidence=f"Directory index detected. Matched signature: {matched_sig}",
+                        remediation="Disable directory indexing in server config (Apache: 'Options -Indexes', Nginx: 'autoindex off;').",
+                        category="info_disclosure",
+                        confidence="CONFIRMED",
+                    )
+                    vulns.append(vuln)
+                    self._add_vuln(vuln)
+
+            except requests.RequestException:
+                continue
+
+        return vulns
+
     def check_parameter_reflection(self) -> list[Vulnerability]:
         """
         Accurate Reflected XSS / Input Injection test.
@@ -727,6 +823,7 @@ class VulnerabilityScanner:
         self.check_cors()
         self.check_clickjacking()
         self.check_sensitive_files()
+        self.check_directory_listing()
         self.check_parameter_reflection()
         self.check_open_redirect()
         self.check_information_disclosure()

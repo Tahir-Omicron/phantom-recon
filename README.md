@@ -18,7 +18,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v120">What's New in v1.2.0</a> •
+  <a href="#whats-new-in-v130">What's New in v1.3.0</a> •
   <a href="#modules">Modules</a> •
   <a href="#installation">Installation</a> •
   <a href="#usage">Usage</a> •
@@ -26,6 +26,23 @@
   <a href="#api-reference">API</a> •
   <a href="#contributing">Contributing</a>
 </p>
+
+---
+
+## 🚀 What's New in v1.3.0
+
+- 📊 **Multi-Format Enterprise Reporting (CSV & Markdown)**:
+  - **CSV Export (`--format csv`)**: UTF-8 BOM encoding for seamless Microsoft Excel, Google Sheets, Jira, and DefectDojo vulnerability import.
+  - **Markdown Export (`--format md`)**: GitHub-flavored formatted reports with severity tables and PoC blocks for bug bounties (HackerOne, Bugcrowd) and PR reviews.
+  - **In-Browser Export**: Direct `Export CSV` and `Export JSON` buttons inside the live HTML glassmorphism dashboard.
+- 📂 **Directory Listing Engine**:
+  - High-precision detection of open directory indexes (`/uploads/`, `/static/`, `/backup/`, etc.) with zero-false-positive validation against web server signatures (Apache, Nginx, IIS).
+- 💾 **Enhanced Sensitive File Probes**:
+  - Semantic signature validation for exposed SQL database dumps (`/backup.sql`) and macOS metadata (`/.DS_Store`).
+- 🛡️ **Next-Gen Security Headers**:
+  - Detection for `Cross-Origin-Opener-Policy` (COOP) and `Cross-Origin-Embedder-Policy` (COEP) defenses.
+- 🔄 **Integrated 8-Step Full Recon Pipeline**:
+  - Full recon (`phantom full`) now unifies WHOIS, DNS, Subdomains, Ports, Web Recon (technology fingerprinting & directories), Headers, SSL, and Vulnerability scanning into a single master workflow.
 
 ---
 

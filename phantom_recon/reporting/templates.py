@@ -654,6 +654,9 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                 <button class="btn-action" onclick="window.print()">
                     🖨️ Print / PDF
                 </button>
+                <button class="btn-action" onclick="downloadCSV()">
+                    📊 Export CSV
+                </button>
                 <button class="btn-action" onclick="downloadJSON()">
                     📥 Export JSON
                 </button>
@@ -669,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.2.0 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.3.0 (Zero False Positive)</strong></span>
                 </div>
             </div>
 
@@ -947,6 +950,36 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     gaugeFill.style.stroke = 'var(--neon-red)';
                 }
             }
+        }
+
+        // Download CSV report utility
+        function downloadCSV() {
+            const rawData = {{ data|tojson }};
+            const vulns = rawData.vulnerabilities || [];
+            if (!vulns.length) {
+                alert("No vulnerabilities recorded to export.");
+                return;
+            }
+            const headers = ["ID", "Title", "Severity", "CVSS", "Location", "Direct URL", "PoC cURL", "Evidence", "Remediation"];
+            const rows = vulns.map((v, i) => [
+                i + 1,
+                `"${(v.title || '').replace(/"/g, '""')}"`,
+                `"${(v.severity || '').toUpperCase()}"`,
+                v.cvss_score || 0.0,
+                `"${(v.location || '').replace(/"/g, '""')}"`,
+                `"${(v.poc_url || v.url || '').replace(/"/g, '""')}"`,
+                `"${(v.reproduce_curl || '').replace(/"/g, '""')}"`,
+                `"${(v.evidence || '').replace(/"/g, '""')}"`,
+                `"${(v.remediation || '').replace(/"/g, '""')}"`
+            ]);
+            let csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "phantom_recon_findings.csv";
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         // Download JSON report utility

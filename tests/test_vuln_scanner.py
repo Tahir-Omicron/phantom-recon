@@ -209,3 +209,143 @@ class TestZeroFalsePositiveGuards:
         assert vulns[0].confidence == "CONFIRMED"
         assert vulns[0].severity == "high"
         assert "Query Parameter: 'q'" in vulns[0].location
+
+    @patch("requests.Session.get")
+    def test_directory_listing_detected_with_valid_index(self, mock_get):
+        """Web server directory indexing must be detected and verified."""
+        def mock_request(url, **kwargs):
+            resp = MagicMock()
+            if "/uploads/" in url:
+                resp.status_code = 200
+                resp.text = "<html><head><title>Index of /uploads</title></head><body><pre><a href=\"test.pdf\">test.pdf</a></pre></body></html>"
+                resp.content = resp.text.encode()
+            else:
+                resp.status_code = 404
+                resp.text = "Not found"
+                resp.content = b"Not found"
+            return resp
+
+        mock_get.side_effect = mock_request
+
+        scanner = VulnerabilityScanner(url="https://example.com")
+        vulns = scanner.check_directory_listing()
+
+        assert len(vulns) == 1
+        assert "Insecure Directory Listing Enabled on '/uploads/'" in vulns[0].title
+        assert vulns[0].severity == "medium"
+        assert vulns[0].category == "info_disclosure"
+
+    @patch("requests.Session.get")
+    def test_directory_listing_ignored_on_soft_404(self, mock_get):
+        """Soft-404 catch-alls must not trigger directory listing findings."""
+        spa_html = "<html><body><h1>App Not Found</h1></body></html>"
+        def mock_request(url, **kwargs):
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.text = spa_html
+            resp.content = spa_html.encode()
+            return resp
+
+        mock_get.side_effect = mock_request
+
+        scanner = VulnerabilityScanner(url="https://spa.example.com")
+        vulns = scanner.check_directory_listing()
+
+        assert len(vulns) == 0
+
+    @patch("requests.Session.get")
+    def test_sensitive_file_backup_sql_detected(self, mock_get):
+        """Exposed SQL dump must be detected and flagged as critical."""
+        def mock_request(url, **kwargs):
+            resp = MagicMock()
+            if "/backup.sql" in url:
+                resp.status_code = 200
+                sql_dump = "-- MySQL dump 10.13\nCREATE TABLE users (id int, password varchar(255));\nINSERT INTO users VALUES (1, 'admin_pass');"
+                resp.text = sql_dump
+                resp.content = sql_dump.encode()
+            else:
+                resp.status_code = 404
+                resp.text = "Not found"
+                resp.content = b"Not found"
+            return resp
+
+        mock_get.side_effect = mock_request
+
+        scanner = VulnerabilityScanner(url="https://example.com")
+        vulns = scanner.check_sensitive_files()
+
+        assert any("backup.sql" in v.poc_url for v in vulns)
+        sql_vuln = next(v for v in vulns if "backup.sql" in v.poc_url)
+        assert sql_vuln.severity == "critical"
+        assert sql_vuln.cvss_score == 9.8
+
+
+class TestReportGeneratorFormats:
+    """Tests for CSV and Markdown reporting features in ReportGenerator."""
+
+    def test_csv_report_generation(self, tmp_path):
+        from phantom_recon.reporting.report_generator import ReportGenerator
+
+        sample_data = {
+            "target": "https://test-audit.local",
+            "vulnerabilities": [
+                {
+                    "title": "Exposed Database Dump",
+                    "severity": "critical",
+                    "cvss_score": 9.8,
+                    "confidence": "CONFIRMED",
+                    "category": "sensitive_data",
+                    "location": "URL Path: /backup.sql",
+                    "poc_url": "https://test-audit.local/backup.sql",
+                    "reproduce_curl": "curl -i -k 'https://test-audit.local/backup.sql'",
+                    "evidence": "CREATE TABLE users",
+                    "remediation": "Delete backup.sql",
+                    "description": "Sensitive DB dump found.",
+                }
+            ]
+        }
+
+        output_csv = tmp_path / "findings.csv"
+        gen = ReportGenerator(scan_data=sample_data)
+        gen.generate_csv(str(output_csv))
+
+        assert output_csv.exists()
+        content = output_csv.read_text(encoding="utf-8-sig")
+        assert "Exposed Database Dump" in content
+        assert "CRITICAL" in content
+        assert "9.8" in content
+
+    def test_markdown_report_generation(self, tmp_path):
+        from phantom_recon.reporting.report_generator import ReportGenerator
+
+        sample_data = {
+            "target": "https://test-audit.local",
+            "ports": {"80": {"state": "open", "service": "http", "banner": "nginx"}},
+            "vulnerabilities": [
+                {
+                    "title": "XSS in Search",
+                    "severity": "high",
+                    "cvss_score": 7.5,
+                    "confidence": "CONFIRMED",
+                    "location": "Query Parameter: 'q'",
+                    "poc_url": "https://test-audit.local?q=xss",
+                    "reproduce_curl": "curl -i 'https://test-audit.local?q=xss'",
+                    "evidence": "<script>alert(1)</script>",
+                    "remediation": "HTML encode output.",
+                    "description": "Reflected XSS finding.",
+                }
+            ]
+        }
+
+        output_md = tmp_path / "findings.md"
+        gen = ReportGenerator(scan_data=sample_data)
+        gen.generate_markdown(str(output_md))
+
+        assert output_md.exists()
+        content = output_md.read_text(encoding="utf-8")
+        assert "# 🔥 Phantom Recon — Penetration Testing Report" in content
+        assert "XSS in Search" in content
+        assert "```bash" in content
+        assert "curl -i 'https://test-audit.local?q=xss'" in content
+        assert "| `80/tcp` | `open` | `http` | nginx |" in content
+

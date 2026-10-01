@@ -27,6 +27,7 @@ from phantom_recon.utils.logger import (
     print_scan_summary,
     severity_badge,
 )
+from phantom_recon import __version__
 from phantom_recon.utils.config import load_or_create_config
 
 
@@ -36,8 +37,8 @@ from phantom_recon.utils.config import load_or_create_config
 @click.option("--no-color", is_flag=True, help="Disable colored output.")
 @click.option("--config", "-c", type=str, default=None, help="Path to config file.")
 @click.option("--output", "-o", type=str, default=None, help="Output file path.")
-@click.option("--format", "-f", "output_format", type=click.Choice(["html", "json", "txt"]), default="json", help="Output format.")
-@click.version_option(version="1.0.0", prog_name="Phantom Recon")
+@click.option("--format", "-f", "output_format", type=click.Choice(["html", "json", "txt", "csv", "md"]), default="json", help="Output format.")
+@click.version_option(version=__version__, prog_name="Phantom Recon")
 @click.pass_context
 def main(ctx, verbose, no_color, config, output, output_format):
     """🔥 Phantom Recon — Advanced Penetration Testing & Reconnaissance Toolkit"""
@@ -452,23 +453,27 @@ def network(ctx, target, discover, do_traceroute):
 # ─── Report Generation ──────────────────────────────────────────
 @main.command()
 @click.option("--input", "-i", "input_file", required=True, help="Input JSON scan data file.")
-@click.option("--format", "-f", "report_format", type=click.Choice(["html", "json", "txt"]), default="html")
+@click.option("--format", "-f", "report_format", type=click.Choice(["html", "json", "txt", "csv", "md"]), default="html")
 @click.option("--output", "-o", required=True, help="Output report file path.")
 @click.pass_context
 def report(ctx, input_file, report_format, output):
-    """📊 Generate reports from scan data."""
+    """📊 Generate reports from scan data in HTML, JSON, TXT, CSV, or Markdown."""
     print_banner()
     section_header("Report Generator")
 
     from phantom_recon.reporting.report_generator import ReportGenerator
 
-    with open(input_file, "r") as f:
+    with open(input_file, "r", encoding="utf-8") as f:
         scan_data = json.load(f)
 
     generator = ReportGenerator(scan_data=scan_data)
 
     if report_format == "html":
         generator.generate_html(output)
+    elif report_format == "csv":
+        generator.generate_csv(output)
+    elif report_format in ("md", "markdown"):
+        generator.generate_markdown(output)
     elif report_format == "json":
         generator.generate_json(output)
     elif report_format == "txt":
@@ -483,7 +488,7 @@ def report(ctx, input_file, report_format, output):
 @click.option("--output", "-o", default="phantom_report.html", help="Output report file.")
 @click.pass_context
 def full(ctx, target, output):
-    """🎯 Full reconnaissance pipeline."""
+    """🎯 Full reconnaissance pipeline with web fingerprinting and zero-false-positive audit."""
     print_banner()
     section_header("Full Recon Pipeline")
     info(f"Target: {target}")
@@ -492,7 +497,7 @@ def full(ctx, target, output):
 
     # 1. WHOIS
     try:
-        section_header("Step 1/7: WHOIS Lookup")
+        section_header("Step 1/8: WHOIS Lookup")
         from phantom_recon.core.whois_lookup import WhoisLookup
         whois_data = WhoisLookup(target=target).lookup()
         all_results["whois"] = whois_data
@@ -502,7 +507,7 @@ def full(ctx, target, output):
 
     # 2. DNS
     try:
-        section_header("Step 2/7: DNS Enumeration")
+        section_header("Step 2/8: DNS Enumeration")
         from phantom_recon.core.dns_enum import DNSEnumerator
         dns_data = DNSEnumerator(domain=target).enumerate_all()
         all_results["dns"] = dns_data
@@ -512,7 +517,7 @@ def full(ctx, target, output):
 
     # 3. Subdomain Discovery
     try:
-        section_header("Step 3/7: Subdomain Discovery")
+        section_header("Step 3/8: Subdomain Discovery")
         from phantom_recon.core.subdomain import SubdomainFinder
         subs = SubdomainFinder(domain=target, threads=20).find_all()
         all_results["subdomains"] = subs
@@ -522,7 +527,7 @@ def full(ctx, target, output):
 
     # 4. Port Scan
     try:
-        section_header("Step 4/7: Port Scanning")
+        section_header("Step 4/8: Port Scanning")
         from phantom_recon.core.scanner import PortScanner
         scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
         all_results["ports"] = scan_results.get("ports", {})
@@ -530,9 +535,22 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Port scan failed: {e}")
 
-    # 5. Header Analysis
+    # 5. Web Reconnaissance
     try:
-        section_header("Step 5/7: Header Analysis")
+        section_header("Step 5/8: Web Application Reconnaissance")
+        from phantom_recon.core.web_recon import WebRecon
+        url = f"https://{target}" if not target.startswith("http") else target
+        web_results = WebRecon(url=url).run_full_recon()
+        all_results["technologies"] = web_results.get("technologies", [])
+        all_results["directories"] = web_results.get("directories", [])
+        all_results["forms"] = web_results.get("forms", [])
+        success(f"Detected {len(all_results['technologies'])} technologies and {len(all_results['directories'])} directories")
+    except Exception as e:
+        warning(f"Web reconnaissance failed: {e}")
+
+    # 6. Header Analysis
+    try:
+        section_header("Step 6/8: Header Analysis")
         from phantom_recon.core.header_analyzer import HeaderAnalyzer
         url = f"https://{target}" if not target.startswith("http") else target
         header_data = HeaderAnalyzer(url=url).analyze()
@@ -541,9 +559,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Header analysis failed: {e}")
 
-    # 6. SSL Analysis
+    # 7. SSL Analysis
     try:
-        section_header("Step 6/7: SSL/TLS Analysis")
+        section_header("Step 7/8: SSL/TLS Analysis")
         from phantom_recon.core.ssl_analyzer import SSLAnalyzer
         ssl_data = SSLAnalyzer(host=target).analyze()
         all_results["ssl"] = ssl_data
@@ -551,9 +569,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"SSL analysis failed: {e}")
 
-    # 7. Vulnerability Scan
+    # 8. Vulnerability Scan
     try:
-        section_header("Step 7/7: Vulnerability Scan")
+        section_header("Step 8/8: Vulnerability Scan")
         from phantom_recon.core.vuln_scanner import VulnerabilityScanner
         url = f"https://{target}" if not target.startswith("http") else target
         vuln_data = VulnerabilityScanner(url=url).scan_all()
@@ -567,7 +585,11 @@ def full(ctx, target, output):
     from phantom_recon.reporting.report_generator import ReportGenerator
     generator = ReportGenerator(scan_data=all_results)
 
-    if output.endswith(".json"):
+    if output.endswith(".csv"):
+        generator.generate_csv(output)
+    elif output.endswith(".md") or output.endswith(".markdown"):
+        generator.generate_markdown(output)
+    elif output.endswith(".json"):
         generator.generate_json(output)
     elif output.endswith(".txt"):
         generator.generate_text(output)
@@ -583,28 +605,30 @@ def full(ctx, target, output):
 
 
 def _save_output(ctx: click.Context, data: dict) -> None:
-    """Save output to file if --output specified with automatic HTML/JSON/TXT formatting."""
+    """Save output to file if --output specified with automatic HTML/JSON/TXT/CSV/MD formatting."""
     output = ctx.obj.get("output") or ctx.params.get("output")
     if output:
         output_format = ctx.obj.get("format", "json")
         path = Path(output)
         path.parent.mkdir(parents=True, exist_ok=True)
 
+        scan_dict = dict(data)
+        if "target" not in scan_dict and "url" in scan_dict:
+            scan_dict["target"] = scan_dict["url"]
+
+        from phantom_recon.reporting.report_generator import ReportGenerator
+        gen = ReportGenerator(scan_data=scan_dict)
+
         if output.endswith(".html") or output_format == "html":
-            from phantom_recon.reporting.report_generator import ReportGenerator
-            # Format data with target if missing
-            scan_dict = dict(data)
-            if "target" not in scan_dict and "url" in scan_dict:
-                scan_dict["target"] = scan_dict["url"]
-            gen = ReportGenerator(scan_data=scan_dict)
             gen.generate_html(str(path))
             success(f"Interactive HTML Report generated: [bold underline cyan]{path}[/bold underline cyan]")
+        elif output.endswith(".csv") or output_format == "csv":
+            gen.generate_csv(str(path))
+            success(f"CSV Report generated: [bold]{path}[/bold]")
+        elif output.endswith(".md") or output_format in ("md", "markdown"):
+            gen.generate_markdown(str(path))
+            success(f"Markdown Report generated: [bold]{path}[/bold]")
         elif output.endswith(".txt") or output_format == "txt":
-            from phantom_recon.reporting.report_generator import ReportGenerator
-            scan_dict = dict(data)
-            if "target" not in scan_dict and "url" in scan_dict:
-                scan_dict["target"] = scan_dict["url"]
-            gen = ReportGenerator(scan_data=scan_dict)
             gen.generate_text(str(path))
             success(f"Plain Text Report generated: [bold]{path}[/bold]")
         else:

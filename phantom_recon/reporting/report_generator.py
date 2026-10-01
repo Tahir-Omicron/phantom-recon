@@ -7,11 +7,13 @@ with severity-sorted findings and remediation recommendations.
 ⚠️ DISCLAIMER: For authorized security testing only.
 """
 
+import csv
 import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from phantom_recon import __version__
 from phantom_recon.utils.logger import get_logger, console
 
 logger = get_logger(__name__)
@@ -83,7 +85,7 @@ class ReportGenerator:
         report = {
             "report_metadata": {
                 "tool": "Phantom Recon",
-                "version": "1.0.0",
+                "version": __version__,
                 "generated_at": self.timestamp,
                 "report_format": "json",
             },
@@ -98,6 +100,216 @@ class ReportGenerator:
         )
 
         logger.info(f"JSON report saved to [bold]{output_path}[/bold]")
+        return str(path.absolute())
+
+    def generate_csv(self, output_path: str) -> str:
+        """
+        Generate a CSV report of verified vulnerabilities and findings.
+        Uses UTF-8 with BOM for native compatibility with Microsoft Excel,
+        Google Sheets, Jira, DefectDojo, and SIEM ingestion.
+
+        Args:
+            output_path: File path for the CSV report.
+
+        Returns:
+            Path to the generated report.
+        """
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        vulns = self.scan_data.get("vulnerabilities", [])
+        fieldnames = [
+            "ID",
+            "Title",
+            "Severity",
+            "CVSS_Score",
+            "Confidence",
+            "Category",
+            "Location",
+            "Target_URL",
+            "Direct_PoC_URL",
+            "PoC_cURL",
+            "Evidence",
+            "Remediation",
+            "Description",
+        ]
+
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+            writer.writerow(fieldnames)
+
+            for idx, vuln in enumerate(vulns, 1):
+                if isinstance(vuln, dict):
+                    writer.writerow([
+                        idx,
+                        vuln.get("title", ""),
+                        vuln.get("severity", "info").upper(),
+                        vuln.get("cvss_score", 0.0),
+                        vuln.get("confidence", "CONFIRMED"),
+                        vuln.get("category", ""),
+                        vuln.get("location", ""),
+                        vuln.get("url", self.scan_data.get("target", "")),
+                        vuln.get("poc_url", ""),
+                        vuln.get("reproduce_curl", ""),
+                        vuln.get("evidence", ""),
+                        vuln.get("remediation", ""),
+                        vuln.get("description", ""),
+                    ])
+
+        logger.info(f"CSV report saved to [bold]{output_path}[/bold]")
+        return str(path.absolute())
+
+    def generate_markdown(self, output_path: str) -> str:
+        """
+        Generate a GitHub-flavored Markdown report.
+        Ideal for GitHub/GitLab issues, bug bounty reports (HackerOne/Bugcrowd),
+        and documentation repositories.
+
+        Args:
+            output_path: File path for the Markdown report.
+
+        Returns:
+            Path to the generated report.
+        """
+        target = self.scan_data.get("target") or self.scan_data.get("url", "N/A")
+        vulns = self.scan_data.get("vulnerabilities", [])
+
+        # Count severities
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for v in vulns:
+            if isinstance(v, dict):
+                sev = v.get("severity", "info").lower()
+                sev_counts[sev] = sev_counts.get(sev, 0) + 1
+
+        md_lines = []
+        md_lines.append("# 🔥 Phantom Recon — Penetration Testing Report")
+        md_lines.append("")
+        md_lines.append(f"> **Target:** `{target}`  ")
+        md_lines.append(f"> **Generated:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`  ")
+        md_lines.append(f"> **Toolkit Version:** `v{__version__}`  ")
+        md_lines.append("")
+        md_lines.append("---")
+        md_lines.append("")
+        md_lines.append("## 📊 Executive Summary")
+        md_lines.append("")
+        md_lines.append("| Severity | Count | Status |")
+        md_lines.append("| :--- | :---: | :--- |")
+        md_lines.append(f"| 🔴 **Critical** | {sev_counts['critical']} | Immediate Action Required |")
+        md_lines.append(f"| 🟠 **High** | {sev_counts['high']} | Priority Remediation |")
+        md_lines.append(f"| 🟡 **Medium** | {sev_counts['medium']} | Moderate Risk |")
+        md_lines.append(f"| 🔵 **Low** | {sev_counts['low']} | Low Risk |")
+        md_lines.append(f"| ⚪ **Info** | {sev_counts['info']} | Informational / Best Practice |")
+        md_lines.append("")
+
+        if vulns:
+            md_lines.append("---")
+            md_lines.append("")
+            md_lines.append("## 🛡️ Vulnerability Findings Overview")
+            md_lines.append("")
+            md_lines.append("| # | Severity | Title | Location | CVSS |")
+            md_lines.append("| :-: | :--- | :--- | :--- | :-: |")
+            for idx, v in enumerate(vulns, 1):
+                if isinstance(v, dict):
+                    sev = v.get("severity", "info").upper()
+                    title = v.get("title", "Finding")
+                    loc = v.get("location", "Global")
+                    cvss = v.get("cvss_score", "N/A")
+                    poc_url = v.get("poc_url", "")
+                    link_title = f"[{title}]({poc_url})" if poc_url else title
+                    md_lines.append(f"| {idx} | **{sev}** | {link_title} | `{loc}` | {cvss} |")
+            md_lines.append("")
+
+            md_lines.append("---")
+            md_lines.append("")
+            md_lines.append("## 🔍 Detailed Vulnerability Breakdown")
+            md_lines.append("")
+            for idx, v in enumerate(vulns, 1):
+                if isinstance(v, dict):
+                    sev = v.get("severity", "info").upper()
+                    title = v.get("title", "Finding")
+                    loc = v.get("location", "Global")
+                    poc_url = v.get("poc_url", "")
+                    reproduce_curl = v.get("reproduce_curl", "")
+                    evidence = v.get("evidence", "")
+                    desc = v.get("description", "")
+                    remedy = v.get("remediation", "")
+                    cvss = v.get("cvss_score", "N/A")
+
+                    md_lines.append(f"### #{idx}. {title} `[{sev}]`")
+                    md_lines.append("")
+                    md_lines.append(f"- **Severity:** `{sev}` (CVSS: `{cvss}`)")
+                    md_lines.append(f"- **Location:** `{loc}`")
+                    if poc_url:
+                        md_lines.append(f"- **Direct Jump Link:** [{poc_url}]({poc_url})")
+                    md_lines.append("")
+                    md_lines.append(f"**Description:**  \n{desc}")
+                    md_lines.append("")
+                    if reproduce_curl:
+                        md_lines.append("**Reproduction Proof of Concept (cURL):**")
+                        md_lines.append("```bash")
+                        md_lines.append(reproduce_curl)
+                        md_lines.append("```")
+                        md_lines.append("")
+                    if evidence:
+                        md_lines.append("**Verified Evidence:**")
+                        md_lines.append("```text")
+                        md_lines.append(evidence)
+                        md_lines.append("```")
+                        md_lines.append("")
+                    if remedy:
+                        md_lines.append(f"**💡 Remediation:**  \n{remedy}")
+                        md_lines.append("")
+                    md_lines.append("---")
+                    md_lines.append("")
+
+        # Port scan
+        ports = self.scan_data.get("ports", {})
+        if ports and isinstance(ports, dict):
+            md_lines.append("## 🔍 Open Network Ports")
+            md_lines.append("")
+            md_lines.append("| Port | State | Service | Banner |")
+            md_lines.append("| :--- | :--- | :--- | :--- |")
+            for port, info in ports.items():
+                if isinstance(info, dict):
+                    p_state = info.get("state", "open")
+                    p_serv = info.get("service", "unknown")
+                    p_banner = info.get("banner", "")[:40]
+                    md_lines.append(f"| `{port}/tcp` | `{p_state}` | `{p_serv}` | {p_banner} |")
+            md_lines.append("")
+
+        # Technologies
+        techs = self.scan_data.get("technologies", [])
+        if techs:
+            md_lines.append("## 🌐 Detected Technologies")
+            md_lines.append("")
+            for t in techs:
+                md_lines.append(f"- `{t}`")
+            md_lines.append("")
+
+        # Security Headers
+        headers_data = self.scan_data.get("headers", {})
+        if headers_data and isinstance(headers_data, dict):
+            md_lines.append("## 📋 Security Headers")
+            md_lines.append("")
+            md_lines.append(f"**Overall Grade:** `{headers_data.get('grade', 'N/A')}`")
+            md_lines.append("")
+            md_lines.append("| Status | Header | Value | Recommendation |")
+            md_lines.append("| :---: | :--- | :--- | :--- |")
+            for chk in headers_data.get("checks", []):
+                if isinstance(chk, dict):
+                    icon = "✅" if chk.get("secure") else "❌"
+                    hdr = chk.get("header", "")
+                    val = chk.get("value", "") or "*missing*"
+                    rec = chk.get("recommendation", "")
+                    md_lines.append(f"| {icon} | `{hdr}` | `{val[:30]}` | {rec[:50]} |")
+            md_lines.append("")
+
+        md_content = "\n".join(md_lines)
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(md_content, encoding="utf-8")
+
+        logger.info(f"Markdown report saved to [bold]{output_path}[/bold]")
         return str(path.absolute())
 
     def generate_text(self, output_path: str) -> str:
@@ -115,7 +327,7 @@ class ReportGenerator:
         lines.append("  PHANTOM RECON — PENETRATION TESTING REPORT")
         lines.append("=" * 70)
         lines.append(f"  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        lines.append(f"  Tool Version: 1.0.0")
+        lines.append(f"  Tool Version: {__version__}")
         lines.append("=" * 70)
         lines.append("")
 
