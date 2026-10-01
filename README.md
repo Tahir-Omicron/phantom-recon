@@ -38,16 +38,19 @@
 
 | Feature | Description |
 |---------|-------------|
+| 🎯 **Exact Location Tracing** | Dəqiq harada tapıldığı görünür: Parameter (`q`), Header (`CSP`), fayl yolu (`/.env`) |
+| 🔗 **Clickable Jump Links** | Terminalda və HTML hesabatında birbaşa açılan linklər (`target="_blank"`) |
+| 📋 **1-Click PoC cURL** | Tək kliklə kopyalanan hazır `curl` test əmri ilə anında təkrarlama |
 | 🔍 **Port Scanning** | TCP SYN/Connect/UDP scanning with service detection and banner grabbing |
 | 🌐 **Web Reconnaissance** | Technology fingerprinting, directory bruteforce, form detection |
 | 📡 **DNS Enumeration** | Full record lookup, zone transfer, wildcard detection |
 | 🔎 **Subdomain Discovery** | Brute force, Certificate Transparency, async resolution |
-| 🛡️ **Vulnerability Scanning** | SQLi, XSS, CORS, security headers, default credentials |
+| 🛡️ **Vulnerability Scanning** | SQLi, Reflected XSS, CORS, Sensitive files (.env, .git), Open Redirect |
 | 🔐 **SSL/TLS Analysis** | Certificate validation, cipher enumeration, protocol detection |
 | 🔑 **Brute Force** | SSH, FTP, HTTP Auth/Form with rate limiting |
 | 🗺️ **Network Mapping** | Host discovery, ARP scanning, traceroute |
 | 📋 **WHOIS Lookup** | Domain/IP registration details |
-| 📊 **Report Generation** | Professional HTML/JSON/TXT reports with severity ratings |
+| 📊 **Interactive HTML Reports** | Real-time copy buttons, toast notifications, CVSS 3.1 & Confidence ratings |
 
 ---
 
@@ -304,13 +307,13 @@ for sub in all_subs:
 Detect common web vulnerabilities.
 
 ```bash
-# Full vulnerability scan
-phantom vuln --url https://example.com --checks all
+# Full vulnerability scan with live location tracking
+phantom vuln --url https://example.com
 
-# Specific checks
-phantom vuln --url https://example.com --checks sqli,xss,headers
+# Direct export to interactive HTML report with 1-click copy buttons
+phantom vuln --url https://example.com -o report.html
 
-# Deep scan (more payloads, slower)
+# Deep scan mode
 phantom vuln --url https://example.com --deep
 ```
 
@@ -322,24 +325,24 @@ scanner = VulnerabilityScanner(url="https://example.com")
 vulns = scanner.scan_all()
 
 for vuln in vulns:
-    print(f"[{vuln['severity']}] {vuln['title']}")
-    print(f"  Description: {vuln['description']}")
-    print(f"  Remediation: {vuln['remediation']}")
+    print(f"[{vuln['severity'].upper()}] {vuln['title']}")
+    print(f"  📍 Location:     {vuln['location']}")
+    print(f"  🔗 Direct Link:  {vuln['poc_url']}")
+    print(f"  💻 PoC cURL:     {vuln['reproduce_curl']}")
+    print(f"  💡 Remediation:  {vuln['remediation']}\n")
 ```
 
-**Checks Performed:**
+**Features & Checks Performed:**
 
-| Check | Description | Severity |
-|-------|-------------|----------|
-| SQL Injection | Error-based & time-based detection | 🔴 Critical |
-| XSS | Reflected cross-site scripting | 🔴 Critical |
-| Directory Traversal | Path traversal vulnerabilities | 🟠 High |
-| Open Redirect | Unvalidated redirects | 🟡 Medium |
-| CORS Misconfig | Overly permissive CORS | 🟡 Medium |
-| Clickjacking | Missing X-Frame-Options | 🟡 Medium |
-| Security Headers | Missing HSTS, CSP, etc. | 🔵 Low |
-| Info Disclosure | Server version, debug info | 🔵 Low |
-| Default Credentials | Common default username/passwords | 🔴 Critical |
+| Check | Exact Location Traced | Severity | CVSS | Direct PoC |
+|-------|-----------------------|----------|------|------------|
+| 🔴 **Sensitive Files** | `/.env`, `/.git/HEAD`, `/phpinfo.php`, `wp-config.bak` | Critical / High | 9.8 | 🔗 Clickable direct URL + cURL |
+| 🔴 **Reflected XSS** | Param: `?q=`, `?id=`, etc. with unescaped markup | High | 7.2 | 🔗 Injected PoC URL + cURL |
+| 🟠 **CORS Misconfig** | Header: `Origin` -> `Access-Control-Allow-Origin` | High / Crit | 7.1-8.8 | 💻 cURL with reflected Origin |
+| 🟡 **Open Redirect** | Param: `?redirect=`, `?url=`, `?goto=` | Medium | 6.1 | 🔗 Clickable canary redirect URL |
+| 🟡 **Clickjacking** | Headers: `X-Frame-Options` & `frame-ancestors` | Medium | 5.4 | 💻 iframe snippet + cURL |
+| 🔵 **Security Headers**| Missing `CSP`, `HSTS`, `X-Content-Type-Options` | Med / Low | 3.1-6.1 | 💻 cURL inspection command |
+| 🔵 **Info Disclosure** | Headers: `Server`, `X-Powered-By` leaks | Low | 3.7 | 💻 Header fingerprint check |
 
 ---
 

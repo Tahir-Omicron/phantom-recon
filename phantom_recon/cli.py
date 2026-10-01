@@ -214,16 +214,19 @@ def subdomain(ctx, domain, wordlist, threads, ct_logs):
     _save_output(ctx, {"domain": domain, "subdomains": results})
 
 
-# ─── Vulnerability Scan ─────────────────────────────────────────
 @main.command()
 @click.option("--url", "-u", required=True, help="Target URL.")
-@click.option("--checks", default="all", help="Checks to run (all, headers, cors, redirect).")
+@click.option("--checks", default="all", help="Checks to run (all, headers, cors, redirect, sensitive).")
 @click.option("--deep", is_flag=True, help="Deep scan mode.")
+@click.option("--output", "-o", default=None, help="Output file path (e.g. report.html or scan.json).")
 @click.pass_context
-def vuln(ctx, url, checks, deep):
-    """🛡️ Vulnerability scanning."""
+def vuln(ctx, url, checks, deep, output):
+    """🛡️ Vulnerability scanning with exact location tracing and direct jump links."""
     print_banner()
     section_header("Vulnerability Scanner")
+
+    if output:
+        ctx.obj["output"] = output
 
     from phantom_recon.core.vuln_scanner import VulnerabilityScanner
 
@@ -234,16 +237,31 @@ def vuln(ctx, url, checks, deep):
     if results:
         rows = []
         for v in results:
+            poc_link = v.get("poc_url") or url
             rows.append([
                 severity_badge(v["severity"]),
                 v["title"],
-                v.get("remediation", "")[:60],
+                f"[cyan]{v.get('location', 'Global')}[/cyan]",
+                f"[link={poc_link}][underline blue]{poc_link[:45]}...[/underline blue][/link]" if len(poc_link) > 45 else f"[link={poc_link}][underline blue]{poc_link}[/underline blue][/link]",
             ])
         print_results_table(
-            f"Vulnerabilities — {url}",
-            [("Severity", ""), ("Title", "bold"), ("Remediation", "dim")],
+            f"Vulnerability Assessment — {url}",
+            [("Severity", ""), ("Title", "bold"), ("Location", "cyan"), ("Direct Link (Clickable)", "")],
             rows,
         )
+
+        # Print detailed breakdown for direct access & verification
+        console.print("[bold yellow]📍 DETAILED VULNERABILITY LOCATIONS & REPRODUCTION LINKS:[/bold yellow]\n")
+        for idx, v in enumerate(results, 1):
+            poc_link = v.get("poc_url") or url
+            curl_cmd = v.get("reproduce_curl") or f"curl -i -k '{poc_link}'"
+            console.print(f"  [bold white]#{idx} {v['title']}[/bold white] ({severity_badge(v['severity'])})")
+            console.print(f"     [bold cyan]📍 Location:[/bold cyan]    {v.get('location', 'Global Application')}")
+            console.print(f"     [bold green]🔗 Direct Link:[/bold green]  [link={poc_link}][bold underline cyan]{poc_link}[/bold underline cyan][/link]")
+            console.print(f"     [bold magenta]💻 PoC cURL:[/bold magenta]    [dim]{curl_cmd}[/dim]")
+            if v.get("evidence"):
+                console.print(f"     [dim]📋 Evidence:    {v.get('evidence')[:120]}...[/dim]")
+            console.print(f"     [bold green]💡 Fix:[/bold green]         {v.get('remediation', 'N/A')}\n")
 
     summary = scanner.get_summary()
     info(f"Summary: {summary}")
@@ -564,21 +582,34 @@ def full(ctx, target, output):
     info(f"JSON data saved: {json_output}")
 
 
-# ─── Helper ─────────────────────────────────────────────────────
 def _save_output(ctx: click.Context, data: dict) -> None:
-    """Save output to file if --output specified."""
+    """Save output to file if --output specified with automatic HTML/JSON/TXT formatting."""
     output = ctx.obj.get("output") or ctx.params.get("output")
     if output:
         output_format = ctx.obj.get("format", "json")
         path = Path(output)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "json" or output.endswith(".json"):
-            path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+        if output.endswith(".html") or output_format == "html":
+            from phantom_recon.reporting.report_generator import ReportGenerator
+            # Format data with target if missing
+            scan_dict = dict(data)
+            if "target" not in scan_dict and "url" in scan_dict:
+                scan_dict["target"] = scan_dict["url"]
+            gen = ReportGenerator(scan_data=scan_dict)
+            gen.generate_html(str(path))
+            success(f"Interactive HTML Report generated: [bold underline cyan]{path}[/bold underline cyan]")
+        elif output.endswith(".txt") or output_format == "txt":
+            from phantom_recon.reporting.report_generator import ReportGenerator
+            scan_dict = dict(data)
+            if "target" not in scan_dict and "url" in scan_dict:
+                scan_dict["target"] = scan_dict["url"]
+            gen = ReportGenerator(scan_data=scan_dict)
+            gen.generate_text(str(path))
+            success(f"Plain Text Report generated: [bold]{path}[/bold]")
         else:
             path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-
-        info(f"Output saved to {output}")
+            info(f"JSON Data output saved to {output}")
 
 
 if __name__ == "__main__":

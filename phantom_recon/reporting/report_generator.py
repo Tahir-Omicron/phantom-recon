@@ -142,18 +142,30 @@ class ReportGenerator:
         # Vulnerabilities
         vulns = self.scan_data.get("vulnerabilities", [])
         if vulns:
-            lines.append("VULNERABILITIES")
-            lines.append("-" * 40)
+            lines.append("IDENTIFIED VULNERABILITIES & DIRECT JUMP LINKS")
+            lines.append("-" * 70)
             for i, vuln in enumerate(vulns, 1):
                 if isinstance(vuln, dict):
                     severity = vuln.get("severity", "info").upper()
                     title = vuln.get("title", "Unknown")
+                    location = vuln.get("location", "Global Application")
+                    poc_url = vuln.get("poc_url", vuln.get("url", ""))
+                    reproduce_curl = vuln.get("reproduce_curl", "")
+                    evidence = vuln.get("evidence", "")
                     desc = vuln.get("description", "")
                     remedy = vuln.get("remediation", "")
-                    lines.append(f"  [{severity}] {title}")
-                    lines.append(f"    Description: {desc}")
+
+                    lines.append(f"  [{severity}] #{i} {title}")
+                    lines.append(f"    Location:       {location}")
+                    if poc_url:
+                        lines.append(f"    Direct URL:     {poc_url}")
+                    if reproduce_curl:
+                        lines.append(f"    PoC cURL:       {reproduce_curl}")
+                    lines.append(f"    Description:    {desc}")
+                    if evidence:
+                        lines.append(f"    Evidence:       {evidence}")
                     if remedy:
-                        lines.append(f"    Remediation: {remedy}")
+                        lines.append(f"    Remediation:    {remedy}")
                     lines.append("")
 
         # DNS records
