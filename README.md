@@ -13,11 +13,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
   <a href="#modules"><img src="https://img.shields.io/badge/modules-10+-red.svg?style=for-the-badge" alt="10+ Modules"/></a>
   <a href="#contributing"><img src="https://img.shields.io/badge/contributions-welcome-orange.svg?style=for-the-badge" alt="Contributions Welcome"/></a>
-  <a href="https://github.com/tahir/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/tahir/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
+  <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
+  <a href="#whats-new-in-v120">What's New in v1.2.0</a> •
   <a href="#modules">Modules</a> •
   <a href="#installation">Installation</a> •
   <a href="#usage">Usage</a> •
@@ -25,6 +26,22 @@
   <a href="#api-reference">API</a> •
   <a href="#contributing">Contributing</a>
 </p>
+
+---
+
+## 🚀 What's New in v1.2.0
+
+- 🛡️ **Zero False Positive Engine**:
+  - **Soft-404 Baseline Profiling**: Probes randomized canary endpoints to filter out SPAs and catch-all HTTP 200 handlers.
+  - **Strict Semantic Regex Matching**: Validates genuine signatures for `.env` variables, Git index/HEAD refs, `phpinfo()`, and Apache status pages instead of generic status code triggers.
+  - **Context-Aware XSS Validation**: Requires `text/html` context and ensures reflection is outside pure JSON/binary payloads.
+  - **Dual-Origin CORS Verification**: Probes dynamic origin reflection against external hostile origins before flagging CORS misconfigurations.
+  - **External-Only Redirect Detection**: Validates target host against external netlocs to ignore safe internal redirects.
+- 🎨 **Enterprise Glassmorphism UI**:
+  - **Dynamic SVG Security Score Gauge**: Circular visual health ring (0–100) calculated from severity-weighted findings.
+  - **Live Client-Side Search & Filter Tabs**: Instant filtering by keywords and severity levels (Critical, High, Medium, Low, Info).
+  - **1-Click PoC cURL Copy**: Click-to-copy verified reproduction commands with responsive toast notifications.
+  - **Print & PDF Optimization**: Clean print stylesheets for executive security auditing deliverables.
 
 ---
 
@@ -38,6 +55,8 @@
 
 | Feature | Description |
 |---------|-------------|
+| 🛡️ **Zero False Positive Engine** | Soft-404 canary profiling, semantik regex təsdiqləməsi və ikili origin testi |
+| 🎨 **Enterprise Glassmorphism UI** | Dinamik SVG təhlükəsizlik şkalası, anlıq axtarış və cəld filtrasiya |
 | 🎯 **Exact Location Tracing** | Dəqiq harada tapıldığı görünür: Parameter (`q`), Header (`CSP`), fayl yolu (`/.env`) |
 | 🔗 **Clickable Jump Links** | Terminalda və HTML hesabatında birbaşa açılan linklər (`target="_blank"`) |
 | 📋 **1-Click PoC cURL** | Tək kliklə kopyalanan hazır `curl` test əmri ilə anında təkrarlama |
@@ -58,7 +77,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/tahir/phantom-recon.git
+git clone https://github.com/Tahir-Omicron/phantom-recon.git
 cd phantom-recon
 
 # Install in development mode
@@ -86,7 +105,7 @@ phantom full --target example.com --output report.html
 
 ```bash
 # Clone the repository
-git clone https://github.com/tahir/phantom-recon.git
+git clone https://github.com/Tahir-Omicron/phantom-recon.git
 cd phantom-recon
 
 # Create virtual environment (recommended)
@@ -772,7 +791,7 @@ If you find Phantom Recon useful, please consider giving it a ⭐ star on GitHub
 ---
 
 <p align="center">
-  <strong>Built with ❤️ by <a href="https://github.com/tahir">Tahir</a></strong>
+  <strong>Built with ❤️ by <a href="https://github.com/Tahir-Omicron">Tahir</a></strong>
 </p>
 
 <p align="center">

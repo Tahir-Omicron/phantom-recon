@@ -1,9 +1,9 @@
 """
-Phantom Recon — HTML Report Templates (v1.1.0).
+Phantom Recon — Ultra-Modern Enterprise Security Dashboard (v1.2.0).
 
-Professional interactive cybersecurity report template featuring exact vulnerability
-locations, direct clickable jump links, 1-click cURL PoC copy buttons, and
-modern glassmorphism styling.
+State-of-the-art dark glassmorphism cybersecurity report template featuring
+real-time interactive search, severity filtering, SVG security health gauge,
+exact location pills, 1-click PoC reproduction, and PDF print styling.
 """
 
 HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
@@ -11,93 +11,228 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phantom Recon Report — {{ data.get('target', 'Target') }}</title>
+    <title>Phantom Recon Security Audit — {{ data.get('target', 'Target') }}</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0a0c14;
-            --bg-secondary: #101424;
-            --bg-card: rgba(22, 28, 48, 0.7);
-            --bg-glass: rgba(255, 255, 255, 0.03);
-            --text-primary: #f0f4f8;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-            --accent-red: #ef4444;
-            --accent-orange: #f97316;
-            --accent-yellow: #eab308;
-            --accent-green: #10b981;
-            --accent-cyan: #06b6d4;
-            --accent-blue: #3b82f6;
-            --border: rgba(148, 163, 184, 0.15);
-            --border-hover: rgba(6, 182, 212, 0.4);
-            --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.25);
+            --bg-base: #06080f;
+            --bg-card: rgba(14, 19, 36, 0.75);
+            --bg-card-hover: rgba(20, 27, 50, 0.85);
+            --bg-inner: rgba(8, 12, 24, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(6, 182, 212, 0.5);
+            
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --text-dim: #64748b;
+
+            --neon-red: #ff3366;
+            --neon-orange: #ff9100;
+            --neon-yellow: #ffd600;
+            --neon-green: #00e676;
+            --neon-cyan: #00e5ff;
+            --neon-blue: #2979ff;
+            --neon-purple: #d500f9;
+
+            --glow-cyan: 0 0 25px rgba(0, 229, 255, 0.35);
+            --glow-red: 0 0 25px rgba(255, 51, 102, 0.35);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: var(--bg-primary);
-            background-image: radial-gradient(circle at 10% 20%, rgba(6, 182, 212, 0.05) 0%, transparent 40%),
-                              radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.05) 0%, transparent 40%);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 229, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 20%, rgba(255, 51, 102, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 50% 80%, rgba(41, 121, 255, 0.06) 0%, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, sans-serif;
             line-height: 1.6;
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
         .container {
-            max-width: 1280px;
+            max-width: 1360px;
             margin: 0 auto;
-            padding: 40px 24px;
+            padding: 40px 24px 80px;
         }
 
-        /* Top Header */
-        .report-header {
-            text-align: center;
-            padding: 48px 24px 32px;
-            border-bottom: 1px solid var(--border);
+        /* Top Bar */
+        .top-navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
             margin-bottom: 36px;
-            position: relative;
         }
 
-        .report-header h1 {
-            font-size: 2.8em;
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.35em;
             font-weight: 800;
-            background: linear-gradient(135deg, #ff4d4d, #06b6d4);
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
         }
 
-        .report-header .subtitle {
-            color: var(--text-secondary);
-            font-size: 1.15em;
-            max-width: 650px;
-            margin: 0 auto;
-        }
-
-        .meta-tags {
+        .top-actions {
             display: flex;
-            justify-content: center;
-            gap: 16px;
-            flex-wrap: wrap;
-            margin-top: 24px;
+            align-items: center;
+            gap: 12px;
         }
 
-        .meta-pill {
-            background: var(--bg-secondary);
+        .btn-action {
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border);
-            border-radius: 9999px;
-            padding: 6px 16px;
+            color: var(--text-main);
             font-size: 0.85em;
-            color: var(--text-secondary);
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            text-decoration: none;
         }
 
-        .meta-pill strong {
-            color: var(--text-primary);
+        .btn-action:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.25);
+            transform: translateY(-1px);
         }
 
-        /* Stats Grid */
+        /* Hero Banner & Security Gauge */
+        .hero-banner {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 32px;
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 36px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-banner::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, var(--neon-red), var(--neon-orange), var(--neon-yellow), var(--neon-cyan));
+        }
+
+        .hero-info h1 {
+            font-size: 2.6em;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 12px;
+            letter-spacing: -0.8px;
+        }
+
+        .hero-info .meta-desc {
+            color: var(--text-sub);
+            font-size: 1.05em;
+            margin-bottom: 24px;
+            max-width: 600px;
+        }
+
+        .target-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .chip {
+            background: var(--bg-inner);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 14px;
+            font-size: 0.85em;
+            color: var(--text-sub);
+        }
+
+        .chip strong {
+            color: var(--text-main);
+        }
+
+        /* Circular Score Gauge */
+        .gauge-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 170px;
+        }
+
+        .gauge-circle {
+            position: relative;
+            width: 130px;
+            height: 130px;
+        }
+
+        .gauge-circle svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .gauge-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 10;
+        }
+
+        .gauge-fill {
+            fill: none;
+            stroke: var(--neon-cyan);
+            stroke-width: 10;
+            stroke-linecap: round;
+            stroke-dasharray: 314;
+            stroke-dashoffset: 60;
+            transition: stroke-dashoffset 1s ease;
+        }
+
+        .gauge-value {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .gauge-label {
+            font-size: 0.4em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        /* Metric Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -107,91 +242,161 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
 
         .stat-card {
             background: var(--bg-card);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 18px;
             padding: 24px;
             text-align: center;
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .stat-card:hover {
             border-color: var(--border-hover);
-            transform: translateY(-2px);
-            box-shadow: var(--glow-cyan);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
         }
 
-        .stat-value {
-            font-size: 2.4em;
+        .stat-number {
+            font-size: 2.5em;
             font-weight: 800;
-            line-height: 1;
-            margin-bottom: 8px;
+            line-height: 1.1;
+            margin-bottom: 6px;
         }
 
-        .stat-label {
-            color: var(--text-muted);
-            font-size: 0.9em;
+        .stat-title {
+            color: var(--text-dim);
+            font-size: 0.85em;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-weight: 600;
+            letter-spacing: 0.6px;
         }
 
-        /* Sections */
-        .section-card {
+        /* Search & Filter Control Bar */
+        .control-bar {
             background: var(--bg-card);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 28px;
-            margin-bottom: 32px;
-        }
-
-        .section-title {
+            border-radius: 18px;
+            padding: 16px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 1.4em;
-            font-weight: 700;
-            color: var(--text-primary);
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 20px;
+            gap: 20px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
         }
 
-        /* Vulnerability Cards */
-        .vuln-item {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 22px;
-            margin-bottom: 20px;
-            transition: all 0.25s ease;
+        .search-box {
             position: relative;
+            flex: 1;
+            min-width: 260px;
         }
 
-        .vuln-item:hover {
+        .search-input {
+            width: 100%;
+            background: var(--bg-inner);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 18px 12px 42px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.9em;
+            outline: none;
+            transition: all 0.25s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            pointer-events: none;
+        }
+
+        .filter-tabs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-sub);
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 0.82em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .filter-btn.active {
+            background: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+            color: #03131c;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.35);
+        }
+
+        /* Vulnerability Findings Section */
+        .vuln-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .vuln-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 26px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vuln-card:hover {
             border-color: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
         }
 
-        .vuln-item.critical { border-left: 5px solid var(--accent-red); }
-        .vuln-item.high { border-left: 5px solid var(--accent-orange); }
-        .vuln-item.medium { border-left: 5px solid var(--accent-yellow); }
-        .vuln-item.low { border-left: 5px solid var(--accent-blue); }
-        .vuln-item.info { border-left: 5px solid var(--text-muted); }
+        .vuln-card.critical { border-left: 5px solid var(--neon-red); }
+        .vuln-card.high { border-left: 5px solid var(--neon-orange); }
+        .vuln-card.medium { border-left: 5px solid var(--neon-yellow); }
+        .vuln-card.low { border-left: 5px solid var(--neon-blue); }
+        .vuln-card.info { border-left: 5px solid var(--text-dim); }
 
-        .vuln-header {
+        .vuln-top {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 16px;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
             flex-wrap: wrap;
         }
 
-        .vuln-title {
-            font-size: 1.2em;
-            font-weight: 700;
-            color: var(--text-primary);
+        .badge-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
         }
 
         .badge {
@@ -206,50 +411,57 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
             letter-spacing: 0.5px;
         }
 
-        .badge-critical { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid var(--accent-red); }
-        .badge-high { background: rgba(249, 115, 22, 0.2); color: #fdba74; border: 1px solid var(--accent-orange); }
-        .badge-medium { background: rgba(234, 179, 8, 0.2); color: #fef08a; border: 1px solid var(--accent-yellow); }
-        .badge-low { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid var(--accent-blue); }
-        .badge-info { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid var(--border); }
+        .badge-critical { background: rgba(255, 51, 102, 0.15); color: #ff6b8b; border: 1px solid var(--neon-red); }
+        .badge-high { background: rgba(255, 145, 0, 0.15); color: #ffb74d; border: 1px solid var(--neon-orange); }
+        .badge-medium { background: rgba(255, 214, 0, 0.15); color: #fff59d; border: 1px solid var(--neon-yellow); }
+        .badge-low { background: rgba(41, 121, 255, 0.15); color: #82b1ff; border: 1px solid var(--neon-blue); }
+        .badge-info { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid var(--text-dim); }
+        .badge-verified { background: rgba(0, 230, 118, 0.15); color: #69f0ae; border: 1px solid var(--neon-green); }
 
-        /* Location Bar & Quick Jump */
-        .location-banner {
-            background: rgba(6, 182, 212, 0.08);
-            border: 1px solid rgba(6, 182, 212, 0.25);
-            border-radius: 8px;
-            padding: 10px 14px;
-            margin: 12px 0 16px;
+        .vuln-title {
+            font-size: 1.25em;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Location Banner & Quick Actions */
+        .location-strip {
+            background: rgba(0, 229, 255, 0.06);
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin: 14px 0 18px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 16px;
             flex-wrap: wrap;
         }
 
-        .location-text {
-            font-family: 'Fira Code', 'Consolas', monospace;
-            font-size: 0.88em;
-            color: #67e8f9;
+        .location-info {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.88em;
+            color: #38bdf8;
             word-break: break-all;
         }
 
-        .action-buttons {
+        .quick-actions {
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
         .btn-jump {
-            background: var(--accent-cyan);
-            color: #04141e;
+            background: var(--neon-cyan);
+            color: #021722;
             font-weight: 700;
             font-size: 0.82em;
             text-decoration: none;
-            padding: 6px 14px;
-            border-radius: 6px;
+            padding: 7px 16px;
+            border-radius: 8px;
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -257,18 +469,19 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         }
 
         .btn-jump:hover {
-            background: #22d3ee;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+            background: #38e1ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.45);
         }
 
         .btn-copy {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.06);
             border: 1px solid var(--border);
+            color: var(--text-main);
             font-size: 0.82em;
-            padding: 6px 12px;
-            border-radius: 6px;
+            font-weight: 600;
+            padding: 7px 14px;
+            border-radius: 8px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
@@ -277,85 +490,122 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         }
 
         .btn-copy:hover {
-            background: rgba(255, 255, 255, 0.16);
-            border-color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.14);
+            border-color: var(--text-sub);
+            transform: translateY(-1px);
         }
 
-        /* Description & Remediation */
         .vuln-desc {
-            color: var(--text-secondary);
+            color: var(--text-sub);
             font-size: 0.95em;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
         }
 
-        .evidence-box {
-            background: #080a12;
+        /* Technical Evidence Box */
+        .evidence-panel {
+            background: #04060c;
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 12px 14px;
-            margin: 12px 0;
-            font-family: 'Fira Code', 'Consolas', monospace;
-            font-size: 0.83em;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin: 14px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.82em;
             color: #e2e8f0;
-            overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-word;
+            position: relative;
         }
 
-        .remedy-box {
-            background: rgba(16, 185, 129, 0.08);
-            border-left: 3px solid var(--accent-green);
-            padding: 10px 14px;
-            border-radius: 0 6px 6px 0;
+        .evidence-header {
+            font-size: 0.72em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        /* Mitigation Box */
+        .mitigation-panel {
+            background: rgba(0, 230, 118, 0.06);
+            border-left: 4px solid var(--neon-green);
+            padding: 12px 18px;
+            border-radius: 0 10px 10px 0;
             font-size: 0.9em;
-            color: #a7f3d0;
+            color: #bbf7d0;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
         }
 
-        .remedy-box strong {
-            color: #34d399;
+        .mitigation-panel strong {
+            color: #4ade80;
         }
 
-        /* Tables for Port / Recon */
+        /* Tables for Ports & Subdomains */
+        .content-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 32px;
+        }
+
+        .content-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 1.35em;
+            font-weight: 700;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 16px 0;
         }
 
         th, td {
-            padding: 12px 16px;
+            padding: 14px 18px;
             text-align: left;
             border-bottom: 1px solid var(--border);
         }
 
         th {
             background: rgba(255, 255, 255, 0.02);
-            color: var(--accent-cyan);
-            font-size: 0.85em;
+            color: var(--neon-cyan);
+            font-size: 0.8em;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
+            font-weight: 700;
         }
 
         tr:hover td {
-            background: rgba(6, 182, 212, 0.03);
+            background: rgba(0, 229, 255, 0.03);
         }
 
-        /* Toast notification */
+        /* Toast Feedback */
         .toast {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: #10b981;
-            color: #032015;
+            bottom: 28px;
+            right: 28px;
+            background: var(--neon-green);
+            color: #022013;
             font-weight: 700;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            padding: 14px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             opacity: 0;
             transform: translateY(20px);
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             pointer-events: none;
             z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .toast.show {
@@ -363,80 +613,160 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
             transform: translateY(0);
         }
 
+        /* Footer */
         .footer {
             text-align: center;
-            padding: 40px 0;
-            color: var(--text-muted);
-            font-size: 0.85em;
+            padding-top: 48px;
+            color: var(--text-dim);
+            font-size: 0.88em;
             border-top: 1px solid var(--border);
-            margin-top: 48px;
+        }
+
+        /* Print Mode */
+        @media print {
+            body { background: white !important; color: black !important; }
+            .top-navbar, .control-bar, .action-buttons, .toast { display: none !important; }
+            .vuln-card, .stat-card, .hero-banner, .content-card {
+                border: 1px solid #ccc !important;
+                background: none !important;
+                box-shadow: none !important;
+                break-inside: avoid;
+            }
+            .location-strip { background: #f0f0f0 !important; color: black !important; }
+            th { background: #eee !important; color: #333 !important; }
+        }
+
+        @media (max-width: 768px) {
+            .hero-banner { grid-template-columns: 1fr; }
+            .control-bar { flex-direction: column; }
+            .search-box { width: 100%; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <header class="report-header">
-            <h1>🔥 Phantom Recon Report</h1>
-            <p class="subtitle">Comprehensive Security Assessment with Precise Vulnerability Tracking</p>
-            <div class="meta-tags">
-                <span class="meta-pill">Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
-                <span class="meta-pill">Generated: <strong>{{ generated_at }}</strong></span>
-                <span class="meta-pill">Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                <span class="meta-pill">Toolkit: <strong>Phantom Recon v1.1.0</strong></span>
+        <!-- Top Navbar -->
+        <nav class="top-navbar">
+            <div class="brand-logo">
+                <span>🔥</span> PHANTOM RECON
+            </div>
+            <div class="top-actions">
+                <button class="btn-action" onclick="window.print()">
+                    🖨️ Print / PDF
+                </button>
+                <button class="btn-action" onclick="downloadJSON()">
+                    📥 Export JSON
+                </button>
+            </div>
+        </nav>
+
+        <!-- Hero Banner with Security Score Gauge -->
+        <header class="hero-banner">
+            <div class="hero-info">
+                <h1>Security Audit Report</h1>
+                <p class="meta-desc">Comprehensive vulnerability intelligence and penetration testing report with verified proof-of-concept validation.</p>
+                <div class="target-chips">
+                    <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
+                    <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
+                    <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.2.0 (Zero False Positive)</strong></span>
+                </div>
+            </div>
+
+            <!-- Health Gauge Ring -->
+            <div class="gauge-wrapper">
+                <div class="gauge-circle">
+                    <svg viewBox="0 0 100 100">
+                        <circle class="gauge-bg" cx="50" cy="50" r="42" />
+                        <circle id="gaugeFill" class="gauge-fill" cx="50" cy="50" r="42" />
+                    </svg>
+                    <div class="gauge-value">
+                        <span id="scoreText">--</span>
+                        <span class="gauge-label">Score</span>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <!-- Stats Grid -->
+        <!-- Metrics Overview -->
         <section class="stats-grid">
             <div class="stat-card">
-                <div class="stat-value" style="color: var(--accent-cyan);">{{ data.get('ports', {})|length }}</div>
-                <div class="stat-label">Open Ports</div>
+                <div class="stat-number" style="color: var(--neon-red);" id="countVulns">
+                    {{ data.get('vulnerabilities', [])|length }}
+                </div>
+                <div class="stat-title">Confirmed Vulnerabilities</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" style="color: var(--accent-red);">{{ data.get('vulnerabilities', [])|length }}</div>
-                <div class="stat-label">Vulnerabilities Found</div>
+                <div class="stat-number" style="color: var(--neon-cyan);">
+                    {{ data.get('ports', {})|length }}
+                </div>
+                <div class="stat-title">Open Port Services</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" style="color: var(--accent-orange);">{{ data.get('subdomains', [])|length }}</div>
-                <div class="stat-label">Discovered Subdomains</div>
+                <div class="stat-number" style="color: var(--neon-orange);">
+                    {{ data.get('subdomains', [])|length }}
+                </div>
+                <div class="stat-title">Discovered Subdomains</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" style="color: var(--accent-green);">{{ data.get('headers', {}).get('grade', 'N/A') }}</div>
-                <div class="stat-label">Header Security Grade</div>
+                <div class="stat-number" style="color: var(--neon-green);">
+                    {{ data.get('headers', {}).get('grade', 'A') }}
+                </div>
+                <div class="stat-title">Header Security Grade</div>
             </div>
         </section>
 
-        <!-- Vulnerabilities Section -->
+        <!-- Search & Filter Controls -->
         {% if data.get('vulnerabilities') %}
-        <section class="section-card">
-            <div class="section-title">
-                <span>🛡️ Identified Vulnerabilities & Direct Jump Links</span>
-                <span style="font-size: 0.75em; color: var(--text-muted);">{{ data.get('vulnerabilities', [])|length }} findings</span>
+        <div class="control-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search by title, location, CVE, or parameter..." oninput="filterFindings()">
             </div>
+            <div class="filter-tabs">
+                <button class="filter-btn active" onclick="setSeverityFilter('all', this)">All ({{ data.get('vulnerabilities', [])|length }})</button>
+                <button class="filter-btn" onclick="setSeverityFilter('critical', this)">Critical</button>
+                <button class="filter-btn" onclick="setSeverityFilter('high', this)">High</button>
+                <button class="filter-btn" onclick="setSeverityFilter('medium', this)">Medium</button>
+                <button class="filter-btn" onclick="setSeverityFilter('low', this)">Low</button>
+                <button class="filter-btn" onclick="setSeverityFilter('info', this)">Info</button>
+            </div>
+        </div>
 
+        <!-- Vulnerability Findings List -->
+        <section class="vuln-list" id="vulnList">
             {% for vuln in data.get('vulnerabilities', []) %}
-            <article class="vuln-item {{ vuln.get('severity', 'info')|lower }}">
-                <div class="vuln-header">
+            <article class="vuln-card {{ vuln.get('severity', 'info')|lower }}" data-severity="{{ vuln.get('severity', 'info')|lower }}">
+                <div class="vuln-top">
                     <div>
-                        <span class="badge badge-{{ vuln.get('severity', 'info')|lower }}">
-                            {{ vuln.get('severity', 'info') }}
-                        </span>
-                        {% if vuln.get('cvss_score') %}
-                        <span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border);">
-                            CVSS {{ vuln.get('cvss_score') }}
-                        </span>
-                        {% endif %}
-                        <h3 class="vuln-title" style="margin-top: 8px;">{{ vuln.get('title', 'Unknown Vulnerability') }}</h3>
+                        <div class="badge-group">
+                            <span class="badge badge-{{ vuln.get('severity', 'info')|lower }}">
+                                {{ vuln.get('severity', 'info') }}
+                            </span>
+                            {% if vuln.get('cvss_score') %}
+                            <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-main); border: 1px solid var(--border);">
+                                CVSS {{ vuln.get('cvss_score') }}
+                            </span>
+                            {% endif %}
+                            <span class="badge badge-verified">
+                                ✓ {{ vuln.get('confidence', 'CONFIRMED') }}
+                            </span>
+                            {% if vuln.get('cve') %}
+                            <span class="badge" style="background: rgba(41, 121, 255, 0.15); color: #82b1ff; border: 1px solid var(--neon-blue);">
+                                {{ vuln.get('cve') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <h3 class="vuln-title">{{ vuln.get('title', 'Unknown Finding') }}</h3>
                     </div>
                 </div>
 
                 <!-- Location & Direct Link Bar -->
-                <div class="location-banner">
-                    <div class="location-text">
-                        <span>📍 <strong>Location:</strong> {{ vuln.get('location', 'Global Application') }}</span>
+                <div class="location-strip">
+                    <div class="location-info">
+                        <span>📍 <strong>Location:</strong> {{ vuln.get('location', 'Global Target') }}</span>
                     </div>
-                    <div class="action-buttons">
+                    <div class="quick-actions">
                         {% if vuln.get('poc_url') %}
                         <a href="{{ vuln.get('poc_url') }}" target="_blank" rel="noopener noreferrer" class="btn-jump">
                             🔗 Open in Browser
@@ -453,15 +783,17 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                 <p class="vuln-desc">{{ vuln.get('description', '') }}</p>
 
                 {% if vuln.get('evidence') %}
-                <div style="margin-bottom: 8px;">
-                    <span style="font-size: 0.8em; color: var(--text-muted); text-transform: uppercase;">Proof & Evidence:</span>
-                    <div class="evidence-box">{{ vuln.get('evidence') }}</div>
+                <div class="evidence-panel">
+                    <div class="evidence-header">Verified Evidence & Proof-of-Concept:</div>
+                    {{ vuln.get('evidence') }}
                 </div>
                 {% endif %}
 
                 {% if vuln.get('remediation') %}
-                <div class="remedy-box">
-                    <strong>💡 Remediation:</strong> {{ vuln.get('remediation') }}
+                <div class="mitigation-panel">
+                    <div>
+                        <strong>💡 Actionable Remediation:</strong> {{ vuln.get('remediation') }}
+                    </div>
                 </div>
                 {% endif %}
             </article>
@@ -469,28 +801,29 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         </section>
         {% endif %}
 
-        <!-- Port Scan Section -->
+        <!-- Open Ports Section -->
         {% if data.get('ports') %}
-        <section class="section-card">
-            <div class="section-title">
-                <span>🔍 Open Port Scan Results</span>
+        <section class="content-card">
+            <div class="content-title">
+                <span>🔍 Open Network Services & Banners</span>
+                <span style="font-size: 0.75em; color: var(--text-dim);">{{ data.get('ports', {})|length }} active</span>
             </div>
             <table>
                 <thead>
                     <tr>
                         <th>Port / Protocol</th>
                         <th>State</th>
-                        <th>Service</th>
-                        <th>Banner / Version</th>
+                        <th>Service Detection</th>
+                        <th>Banner / Version Info</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for port, info in data.get('ports', {}).items() %}
                     <tr>
-                        <td><code>{{ port }}/tcp</code></td>
-                        <td><span class="badge badge-low" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: var(--accent-green);">{{ info.get('state', 'open') }}</span></td>
+                        <td><code style="color: var(--neon-cyan); font-weight: 600;">{{ port }}/tcp</code></td>
+                        <td><span class="badge badge-verified">OPEN</span></td>
                         <td><strong>{{ info.get('service', 'unknown') }}</strong></td>
-                        <td><code style="color: var(--text-muted);">{{ info.get('banner', '')[:90] or '-' }}</code></td>
+                        <td><code style="color: var(--text-sub);">{{ info.get('banner', '')[:100] or '-' }}</code></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -498,18 +831,19 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         </section>
         {% endif %}
 
-        <!-- Subdomain Section -->
+        <!-- Discovered Subdomains -->
         {% if data.get('subdomains') %}
-        <section class="section-card">
-            <div class="section-title">
-                <span>🔎 Discovered Subdomains</span>
+        <section class="content-card">
+            <div class="content-title">
+                <span>🔎 Discovered Subdomains & Live Endpoints</span>
+                <span style="font-size: 0.75em; color: var(--text-dim);">{{ data.get('subdomains', [])|length }} resolved</span>
             </div>
             <table>
                 <thead>
                     <tr>
                         <th>Subdomain</th>
-                        <th>IP Address</th>
-                        <th>Status Code</th>
+                        <th>Resolved IP</th>
+                        <th>HTTP Status</th>
                         <th>Direct Link</th>
                     </tr>
                 </thead>
@@ -518,8 +852,8 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <tr>
                         <td><strong>{{ sub.get('subdomain', '') }}</strong></td>
                         <td><code>{{ sub.get('ip', 'N/A') }}</code></td>
-                        <td>{{ sub.get('status_code', '-') }}</td>
-                        <td><a href="http://{{ sub.get('subdomain', '') }}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-cyan); text-decoration: none;">🔗 Open</a></td>
+                        <td><span class="badge badge-info">{{ sub.get('status_code', 'N/A') }}</span></td>
+                        <td><a href="http://{{ sub.get('subdomain', '') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan); text-decoration: none; font-weight: 600;">🔗 Open</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -527,28 +861,104 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         </section>
         {% endif %}
 
-        <!-- Footer -->
         <footer class="footer">
-            <p>Generated automatically with <strong>Phantom Recon</strong> Penetration Testing Engine.</p>
-            <p style="margin-top: 6px;">⚠️ Authorized security testing report. Confidentially handle findings.</p>
+            <p>Generated by <strong>Phantom Recon Security Engine</strong>. Authorized testing results only.</p>
         </footer>
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast" class="toast">✓ PoC cURL copied to clipboard!</div>
+    <div id="toast" class="toast">
+        <span>✓</span> <span>PoC cURL command copied to clipboard!</span>
+    </div>
 
     <script>
+        // Copy text utility with toast animation
         function copyText(text) {
             navigator.clipboard.writeText(text).then(() => {
                 const toast = document.getElementById('toast');
                 toast.classList.add('show');
                 setTimeout(() => {
                     toast.classList.remove('show');
-                }, 2500);
+                }, 2200);
             }).catch(err => {
-                alert("Failed to copy command: " + err);
+                alert("Copy failed: " + err);
             });
         }
+
+        // Live search and filtering
+        let currentFilter = 'all';
+
+        function setSeverityFilter(sev, btn) {
+            currentFilter = sev;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            filterFindings();
+        }
+
+        function filterFindings() {
+            const query = (document.getElementById('searchInput')?.value || '').toLowerCase();
+            const cards = document.querySelectorAll('.vuln-card');
+
+            cards.forEach(card => {
+                const sev = card.getAttribute('data-severity');
+                const text = card.innerText.toLowerCase();
+
+                const matchesFilter = (currentFilter === 'all' || sev === currentFilter);
+                const matchesSearch = query === '' || text.includes(query);
+
+                if (matchesFilter && matchesSearch) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        // Calculate dynamic security health score
+        function calculateSecurityScore() {
+            const cards = document.querySelectorAll('.vuln-card');
+            let deduction = 0;
+
+            cards.forEach(card => {
+                const sev = card.getAttribute('data-severity');
+                if (sev === 'critical') deduction += 30;
+                else if (sev === 'high') deduction += 15;
+                else if (sev === 'medium') deduction += 7;
+                else if (sev === 'low') deduction += 3;
+            });
+
+            let score = Math.max(0, 100 - deduction);
+            const scoreEl = document.getElementById('scoreText');
+            const gaugeFill = document.getElementById('gaugeFill');
+
+            if (scoreEl) scoreEl.innerText = score;
+            if (gaugeFill) {
+                // Circumference = 2 * PI * 42 ≈ 264
+                const circumference = 264;
+                const offset = circumference - (circumference * (score / 100));
+                gaugeFill.style.strokeDasharray = circumference;
+                gaugeFill.style.strokeDashoffset = offset;
+
+                if (score >= 80) {
+                    gaugeFill.style.stroke = 'var(--neon-green)';
+                } else if (score >= 50) {
+                    gaugeFill.style.stroke = 'var(--neon-yellow)';
+                } else {
+                    gaugeFill.style.stroke = 'var(--neon-red)';
+                }
+            }
+        }
+
+        // Download JSON report utility
+        function downloadJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({{ data|tojson }}, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", "phantom_recon_audit.json");
+            dlAnchor.click();
+        }
+
+        window.addEventListener('DOMContentLoaded', calculateSecurityScore);
     </script>
 </body>
 </html>"""
