@@ -1,0 +1,72 @@
+# ═══════════════════════════════════════════════════════
+#  Phantom Recon — .gitignore
+# ═══════════════════════════════════════════════════════
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking & linting
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# Reports (generated)
+reports/*.html
+reports/*.json
+reports/*.txt
+*.report.html
+*.report.json
+phantom_report.*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Secrets
+*.key
+*.pem
+*.crt
+.env.local
+.env.production
+secrets.yaml
+credentials.yaml
+
+# Wordlists (large custom ones)
+wordlists/custom_*
+wordlists/*.large.txt
