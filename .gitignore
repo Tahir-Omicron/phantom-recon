@@ -70,3 +70,6 @@ credentials.yaml
 # Wordlists (large custom ones)
 wordlists/custom_*
 wordlists/*.large.txt
+
+# Temporary scratch scripts
+scratch/
