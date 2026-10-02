@@ -27,7 +27,7 @@ class ScannerConfig:
 @dataclass
 class WebReconConfig:
     """Web reconnaissance configuration."""
-    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 PhantomRecon/1.0"
+    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 PhantomRecon/1.4.0"
     follow_redirects: bool = True
     max_depth: int = 3
     timeout: float = 10.0

@@ -28,6 +28,16 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
+# Reconfigure Windows standard streams to UTF-8 to prevent charmap encoding errors
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # ─── Custom Theme ───────────────────────────────────────────────
 PHANTOM_THEME = Theme(
     {
@@ -48,7 +58,7 @@ PHANTOM_THEME = Theme(
     }
 )
 
-console = Console(theme=PHANTOM_THEME)
+console = Console(theme=PHANTOM_THEME, legacy_windows=False if sys.platform == "win32" else None)
 
 BANNER = r"""
 [bold red]
@@ -76,7 +86,7 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.0.0 | Author: Tahir | License: MIT[/dim]\n"
+            "[dim]📌 Version 1.4.0 | Author: Tahir | License: MIT[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing only[/dim yellow]",
             border_style="red",
             padding=(1, 2),
