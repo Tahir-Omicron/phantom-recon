@@ -349,3 +349,79 @@ class TestReportGeneratorFormats:
         assert "curl -i 'https://test-audit.local?q=xss'" in content
         assert "| `80/tcp` | `open` | `http` | nginx |" in content
 
+
+class TestV140AdvancedAuditing:
+    """Tests for v1.4.0 Cookie Security, CORS null origin, and Subdomain Takeover."""
+
+    @patch("requests.Session.get")
+    def test_cookie_security_missing_flags(self, mock_get):
+        """Cookies missing Secure, HttpOnly, and SameSite must be identified."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {"Content-Type": "text/html"}
+        
+        # Create a mock cookie
+        mock_cookie = MagicMock()
+        mock_cookie.name = "session_id"
+        mock_cookie.secure = False
+        mock_cookie._rest = {}  # Missing HttpOnly and SameSite
+        
+        mock_resp.cookies = [mock_cookie]
+        mock_get.return_value = mock_resp
+
+        scanner = VulnerabilityScanner(url="https://secure-portal.com")
+        scanner._response = mock_resp
+        vulns = scanner.check_cookie_security()
+
+        assert len(vulns) == 3
+        titles = [v.title for v in vulns]
+        assert any("Missing 'Secure' Flag on 'session_id'" in t for t in titles)
+        assert any("Missing 'HttpOnly' Flag on 'session_id'" in t for t in titles)
+        assert any("Missing 'SameSite' Attribute on 'session_id'" in t for t in titles)
+
+    @patch("requests.Session.get")
+    def test_cors_null_origin_detected(self, mock_get):
+        """Server trusting Origin: null must be flagged as high/medium CORS vulnerability."""
+        def mock_request(url, headers=None, **kwargs):
+            resp = MagicMock()
+            resp.status_code = 200
+            if headers and headers.get("Origin") == "null":
+                resp.headers = {
+                    "Access-Control-Allow-Origin": "null",
+                    "Access-Control-Allow-Credentials": "true"
+                }
+            else:
+                resp.headers = {}
+            return resp
+
+        mock_get.side_effect = mock_request
+
+        scanner = VulnerabilityScanner(url="https://api.test-cors.com")
+        vulns = scanner.check_cors()
+
+        assert any("Insecure 'null' Origin Whitelist" in v.title for v in vulns)
+        null_vuln = next(v for v in vulns if "null" in v.title)
+        assert null_vuln.severity == "high"
+        assert null_vuln.confidence == "CONFIRMED"
+
+    @patch("socket.gethostbyname")
+    @patch("requests.get")
+    def test_subdomain_takeover_detection(self, mock_requests_get, mock_gethostbyname):
+        """Subdomain returning dangling third-party service fingerprint must flag takeover risk."""
+        from phantom_recon.core.subdomain import SubdomainFinder
+
+        mock_gethostbyname.return_value = "192.0.2.1"
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.text = "There isn't a GitHub Pages site here."
+        mock_requests_get.return_value = mock_resp
+
+        finder = SubdomainFinder(domain="acme-corp.com")
+        res = finder._resolve_subdomain("docs")
+
+        assert res is not None
+        assert res["takeover_risk"] is True
+        assert res["takeover_service"] == "GitHub Pages"
+        assert "GitHub Pages site here" in res["takeover_evidence"]
+
+

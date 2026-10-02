@@ -212,6 +212,12 @@ def subdomain(ctx, domain, wordlist, threads, ct_logs):
             rows,
         )
 
+        takeovers = [s for s in results if s.get("takeover_risk")]
+        if takeovers:
+            console.print("\n[bold red]🚨 POTENTIAL SUBDOMAIN TAKEOVER VULNERABILITIES DETECTED:[/bold red]")
+            for t in takeovers:
+                console.print(f"  [bold red]• {t['subdomain']}[/bold red] → Dangling service: [yellow]{t.get('takeover_service', 'Unknown')}[/yellow] (Evidence: {t.get('takeover_evidence', '')})")
+
     _save_output(ctx, {"domain": domain, "subdomains": results})
 
 

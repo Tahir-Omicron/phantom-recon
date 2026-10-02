@@ -78,6 +78,16 @@ COMMON_SUBDOMAINS = [
     "ns5", "ns6", "dns3", "dns4", "resolver",
 ]
 
+# Signatures indicating unclaimed third-party services (Subdomain Takeover)
+TAKEOVER_FINGERPRINTS: dict[str, str] = {
+    "GitHub Pages": "There isn't a GitHub Pages site here",
+    "Amazon S3": "The specified bucket does not exist",
+    "Heroku": "No such app",
+    "Microsoft Azure": "404 Web Site not found",
+    "Shopify": "Sorry, this shop is currently unavailable",
+    "Zendesk": "Help Center Closed",
+}
+
 
 class SubdomainFinder:
     """
@@ -167,9 +177,23 @@ class SubdomainFinder:
                     soup = BeautifulSoup(resp.text, "html.parser")
                     if soup.title:
                         result["title"] = soup.title.string or ""
+
+                # Check for dangling CNAME takeover fingerprint
+                result["takeover_risk"] = False
+                for service, fp in TAKEOVER_FINGERPRINTS.items():
+                    if fp.lower() in resp.text.lower():
+                        result["takeover_risk"] = True
+                        result["takeover_service"] = service
+                        result["takeover_evidence"] = fp
+                        logger.warning(
+                            f"[bold red]🚨 SUBDOMAIN TAKEOVER RISK: {fqdn} matches dangling {service} pattern![/bold red]"
+                        )
+                        break
+
             except requests.RequestException:
                 result["status_code"] = None
                 result["title"] = ""
+                result["takeover_risk"] = False
 
             return result
 

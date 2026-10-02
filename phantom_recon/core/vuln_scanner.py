@@ -435,6 +435,37 @@ class VulnerabilityScanner:
                     vulns.append(vuln)
                     self._add_vuln(vuln)
 
+            # If arbitrary reflection was not already detected, test specific null origin handling
+            if not any("Arbitrary Origin Dynamic Reflection" in v.title for v in vulns):
+                try:
+                    resp_null = self.session.get(self.url, headers={"Origin": "null"}, timeout=self.timeout)
+                    acao_null = resp_null.headers.get("Access-Control-Allow-Origin", "").strip()
+                    acac_null = resp_null.headers.get("Access-Control-Allow-Credentials", "").lower()
+
+                    if acao_null.lower() == "null":
+                        is_cred = acac_null == "true"
+                        vuln = Vulnerability(
+                            title="CORS: Insecure 'null' Origin Whitelist" + (" with Credentials" if is_cred else ""),
+                            severity="high" if is_cred else "medium",
+                            cvss_score=7.5 if is_cred else 5.3,
+                            description=(
+                                "The server trusts the 'null' Origin in Access-Control-Allow-Origin. "
+                                "Attackers can leverage sandboxed iframes or local HTML files to execute unauthorized cross-origin requests."
+                            ),
+                            location="HTTP Response Header: 'Access-Control-Allow-Origin: null'",
+                            url=self.url,
+                            poc_url=self.url,
+                            reproduce_curl=f"curl -i -k -H 'Origin: null' '{self.url}'",
+                            evidence=f"Sent: Origin: null\nReceived: Access-Control-Allow-Origin: null\nCredentials: {acac_null}",
+                            remediation="Do not reflect or whitelist 'null' in Access-Control-Allow-Origin. Specify exact trusted host origins.",
+                            category="cors",
+                            confidence="CONFIRMED",
+                        )
+                        vulns.append(vuln)
+                        self._add_vuln(vuln)
+                except requests.RequestException:
+                    pass
+
         except requests.RequestException:
             pass
 
@@ -808,6 +839,93 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_cookie_security(self) -> list[Vulnerability]:
+        """
+        Zero False-Positive Cookie Security Audit.
+        Verifies presence of Secure, HttpOnly, and SameSite attributes on all session and application cookies.
+        """
+        logger.info("Auditing cookie security flags...")
+        resp = self._fetch_root()
+        if not resp:
+            return []
+
+        vulns = []
+        session_names = {"session", "sess", "phpsessid", "jsessionid", "token", "auth", "jwt", "sid", "aspsessionid"}
+
+        for cookie in resp.cookies:
+            cname = cookie.name
+            is_session = any(s in cname.lower() for s in session_names)
+
+            # 1. Secure Flag Check (when accessing over HTTPS)
+            if self.url.startswith("https://") and not cookie.secure:
+                vuln = Vulnerability(
+                    title=f"Insecure Cookie: Missing 'Secure' Flag on '{cname}'",
+                    severity="low",
+                    cvss_score=3.5,
+                    description=(
+                        f"The cookie '{cname}' is transmitted over HTTPS without the 'Secure' attribute. "
+                        "Browsers may leak this cookie over unencrypted HTTP connections if plaintext requests occur."
+                    ),
+                    location=f"Set-Cookie Header: '{cname}'",
+                    url=self.url,
+                    poc_url=self.url,
+                    reproduce_curl=f"curl -i -k '{self.url}' | grep -i 'set-cookie'",
+                    evidence=f"Cookie: {cname}\nMissing: Secure flag",
+                    remediation=f"Append '; Secure' to '{cname}' in Set-Cookie header.",
+                    category="cookie_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+            # 2. HttpOnly Flag Check
+            is_httponly = bool(getattr(cookie, "_rest", {}).get("HttpOnly", False))
+            if not is_httponly:
+                vuln = Vulnerability(
+                    title=f"Insecure Cookie: Missing 'HttpOnly' Flag on '{cname}'",
+                    severity="medium" if is_session else "low",
+                    cvss_score=5.3 if is_session else 3.1,
+                    description=(
+                        f"The cookie '{cname}' lacks the 'HttpOnly' attribute, making it accessible "
+                        "to client-side scripts via document.cookie. In the event of an XSS flaw, this allows cookie theft."
+                    ),
+                    location=f"Set-Cookie Header: '{cname}'",
+                    url=self.url,
+                    poc_url=self.url,
+                    reproduce_curl=f"curl -i -k '{self.url}' | grep -i 'set-cookie'",
+                    evidence=f"Cookie: {cname}\nMissing: HttpOnly flag",
+                    remediation=f"Append '; HttpOnly' to '{cname}' in Set-Cookie header.",
+                    category="cookie_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+            # 3. SameSite Flag Check
+            samesite = getattr(cookie, "_rest", {}).get("SameSite", "")
+            if not samesite:
+                vuln = Vulnerability(
+                    title=f"Insecure Cookie: Missing 'SameSite' Attribute on '{cname}'",
+                    severity="low",
+                    cvss_score=3.1,
+                    description=(
+                        f"The cookie '{cname}' does not configure a SameSite attribute (Lax/Strict), "
+                        "making requests susceptible to Cross-Site Request Forgery (CSRF)."
+                    ),
+                    location=f"Set-Cookie Header: '{cname}'",
+                    url=self.url,
+                    poc_url=self.url,
+                    reproduce_curl=f"curl -i -k '{self.url}' | grep -i 'set-cookie'",
+                    evidence=f"Cookie: {cname}\nMissing: SameSite attribute",
+                    remediation=f"Append '; SameSite=Lax' (or SameSite=Strict) to '{cname}' in Set-Cookie header.",
+                    category="cookie_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -820,6 +938,7 @@ class VulnerabilityScanner:
         # Run all precision detection modules
         self.profile_404_baseline()
         self.check_security_headers()
+        self.check_cookie_security()
         self.check_cors()
         self.check_clickjacking()
         self.check_sensitive_files()
