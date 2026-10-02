@@ -190,7 +190,12 @@ class ReportGenerator:
         md_lines.append("")
         md_lines.append("---")
         md_lines.append("")
-        md_lines.append("## 📊 Executive Summary")
+        md_lines.append("## 📊 Executive Summary & Security Health Posture")
+        md_lines.append("")
+        from phantom_recon.reporting.security_score import calculate_security_score
+        score_data = self.scan_data.get("security_score") or calculate_security_score(vulns)
+        md_lines.append(f"- 🛡️ **Overall Security Health Score:** **`{score_data['score']} / 100`** (Grade: **`{score_data['grade']}`**)")
+        md_lines.append(f"- 🎯 **Executive Verdict:** *{score_data['verdict']}*")
         md_lines.append("")
         md_lines.append("| Severity | Count | Status |")
         md_lines.append("| :--- | :---: | :--- |")
@@ -365,8 +370,26 @@ class ReportGenerator:
                     hdr = chk.get("header", "")
                     val = chk.get("value", "") or "*missing*"
                     rec = chk.get("recommendation", "")
-                    md_lines.append(f"| {icon} | `{hdr}` | `{val[:30]}` | {rec[:50]} |")
+        # HTTP Methods & Dangerous Verbs
+        if "http_methods" in self.scan_data:
+            hm = self.scan_data["http_methods"]
+            md_lines.append("## 🚫 HTTP Methods & Dangerous Verbs Audit")
             md_lines.append("")
+            adv = hm.get("advertised_methods", [])
+            if adv:
+                md_lines.append(f"- **Advertised Methods:** `{', '.join(adv)}`")
+            allow_h = hm.get("options", {}).get("allow_header")
+            if allow_h:
+                md_lines.append(f"- **Allow Header:** `{allow_h}`")
+            md_lines.append("")
+            probes = hm.get("probes", [])
+            if probes:
+                md_lines.append("| Method | Status | Risk | Evidence |")
+                md_lines.append("| :--- | :---: | :--- | :--- |")
+                for p in probes:
+                    risk_badge = f"**{p['risk']}**"
+                    md_lines.append(f"| `{p['method']}` | HTTP {p['status_code']} | {risk_badge} | {p['evidence']} |")
+                md_lines.append("")
 
         md_content = "\n".join(md_lines)
         path = Path(output_path)
@@ -395,9 +418,14 @@ class ReportGenerator:
         lines.append("=" * 70)
         lines.append("")
 
-        # Target info
+        # Target info & Security Health Posture
         target = self.scan_data.get("target", "N/A")
-        lines.append(f"TARGET: {target}")
+        vulns = self.scan_data.get("vulnerabilities", [])
+        from phantom_recon.reporting.security_score import calculate_security_score
+        score_data = self.scan_data.get("security_score") or calculate_security_score(vulns)
+        lines.append(f"TARGET:                {target}")
+        lines.append(f"SECURITY HEALTH SCORE: {score_data['score']}/100 (GRADE: {score_data['grade']})")
+        lines.append(f"EXECUTIVE VERDICT:     {score_data['verdict']}")
         lines.append("-" * 70)
         lines.append("")
 

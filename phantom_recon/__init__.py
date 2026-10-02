@@ -6,7 +6,7 @@
 ╚══════════════════════════════════════════════════════════════╝
 """
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 __author__ = "Tahir"
 __license__ = "MIT"
 
@@ -23,7 +23,9 @@ from phantom_recon.core.ssl_analyzer import SSLAnalyzer
 from phantom_recon.core.waf_detector import WAFDetector
 from phantom_recon.core.api_scanner import APIScanner
 from phantom_recon.core.cloud_auditor import CloudAuditor
+from phantom_recon.core.http_methods import HTTPMethodsAuditor
 from phantom_recon.reporting.report_generator import ReportGenerator
+from phantom_recon.reporting.security_score import calculate_security_score
 
 __all__ = [
     "PortScanner",
@@ -39,5 +41,7 @@ __all__ = [
     "WAFDetector",
     "APIScanner",
     "CloudAuditor",
+    "HTTPMethodsAuditor",
     "ReportGenerator",
+    "calculate_security_score",
 ]

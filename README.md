@@ -5,20 +5,20 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.7.0)</strong>
+  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.8.0)</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
-  <a href="#modules"><img src="https://img.shields.io/badge/modules-13+-red.svg?style=for-the-badge" alt="13+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-107%20passed-brightgreen.svg?style=for-the-badge" alt="107 Tests Passing"/></a>
+  <a href="#modules"><img src="https://img.shields.io/badge/modules-14+-red.svg?style=for-the-badge" alt="14+ Modules"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-125%20passed-brightgreen.svg?style=for-the-badge" alt="125 Tests Passing"/></a>
   <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v170">What's New in v1.7.0</a> •
+  <a href="#whats-new-in-v180">What's New in v1.8.0</a> •
   <a href="#release-history">Release History</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
@@ -30,33 +30,36 @@
 
 ---
 
-## 🚀 What's New in v1.7.0
+## 🚀 What's New in v1.8.0
 
-- ☁️ **Multi-Cloud Storage & Bucket Leakage Auditor (`phantom cloud`)**:
-  - Full discovery and access posture analysis across **Amazon Web Services (AWS) S3**, **Google Cloud Storage (GCS)**, and **Microsoft Azure Blob Storage**.
-  - Intelligent keyword and subdomain extraction generates high-probability target permutations (`backup`, `data`, `db`, `dev`, `staging`, `logs`, `assets`, etc.).
-  - Distinguishes publicly listable containers (HTTP 200 XML/JSON with object enumeration) vs. protected containers (HTTP 403 Access Denied) with **zero false positives**.
-  - Automatically parses XML responses to extract sample file keys and total object count.
-- 🛡️ **Vulnerability Findings & Explanation Matrix (Executive Table)**:
-  - Added a dedicated, structured technical vulnerability matrix table across all deliverables:
-    - **Interactive HTML Dashboard**: An interactive matrix table directly above vulnerability cards with instant search and severity filtering.
-    - **GitHub Markdown Report**: Full markdown table featuring `What It Is (Description & Impact)` and `Remediation Guidance` columns.
-    - **Plain Text Report**: Structured ASCII matrix table followed by detailed vulnerability dossiers.
-    - **Rich Terminal Console**: Full Rich table with rounded borders and word wrapping rendered upon scan completion.
-  - Ensures penetration testers and management understand *what each vulnerability is*, *its real-world security impact*, and *concrete remediation instructions*.
-- 🎯 **11-Stage Full Autonomous Reconnaissance Pipeline (`phantom full`)**:
-  - Expanded master autonomous pipeline with Cloud Storage & Bucket Exposure Audit as Step 5/11.
-  - Automatically executes end-to-end multi-cloud audits, port scanning, WAF analysis, API discovery, and vulnerability assessments in sequence.
-- 🧪 **Expanded Automated Test Suite (107 Passing Tests)**:
-  - 14 new automated unit tests added for cloud bucket auditing, XML parsing, vulnerability matrix reporting, and CLI operations.
-  - 100% test pass rate in under 3 seconds.
+- 🚫 **HTTP Methods & Dangerous Verbs Auditor (`phantom methods`)**:
+  - Full discovery and auditing of supported HTTP verbs via `OPTIONS` (`Allow` & `Public` headers).
+  - High-precision canary probes with zero false positives:
+    - **HTTP PUT**: Validates unauthenticated file upload / creation vulnerabilities with immediate benign cleanup.
+    - **HTTP DELETE**: Audits whether unauthenticated resource deletion endpoints are exposed.
+    - **HTTP TRACE**: Cross-Site Tracing (XST) probe ensuring exact echo reflection of unique canary tokens.
+    - **WebDAV PROPFIND**: Detects active WebDAV extensions that disclose internal directory and document structures.
+  - HTTP Method Override audit (`X-HTTP-Method-Override: PUT`, `X-Method-Override`).
+- 🛡️ **Executive Security Posture Score & Terminal Scorecard (`print_security_score_gauge`)**:
+  - Standardized 0-100 Security Health Score and Letter Grade (`A+`, `A`, `B`, `C`, `D`, `F`) calculated with severity & CVSS weights.
+  - Ultra-clean terminal scorecard rendered upon scan completion (`phantom vuln`, `phantom methods`, `phantom full`), featuring progress health bars across Web App, Cloud, Cryptography/SSL, DNS, and Network perimeter.
+  - Synchronized across HTML dashboard, Markdown report, and Plain Text report.
+- 🎯 **12-Stage Master Autonomous Reconnaissance Pipeline (`phantom full`)**:
+  - Extended master pipeline to 12 automated phases, with HTTP Methods & Dangerous Verbs Audit as Step 11/12, followed by Vulnerability Matrix as Step 12/12 and the Security Scorecard.
+- 🎨 **Minimalist Red Team Terminal Banner & Sleek Visual Branding**:
+  - Redesigned, ultra-sharp horizontal ASCII banner in crimson red & neon green that fits on standard 80-column terminals with zero line wrapping or unicode block font distortion.
+  - New minimalist cyber red-team banner asset in `assets/banner.png` with pixel typography and glowing demon shield.
+- 🧪 **Expanded Automated Test Suite (125 Passing Tests)**:
+  - 18 new automated tests for HTTP methods, WebDAV, method override, security score algorithm, and report generation.
+  - 100% test pass rate in under 4 seconds.
 
 ---
 
-## 📜 Release History & Changelog (v1.0.0 — v1.7.0)
+## 📜 Release History & Changelog (v1.0.0 — v1.8.0)
 
 | Version | Release Focus | Key Additions & Fixes |
 | :--- | :--- | :--- |
+| **v1.8.0** | **HTTP Methods Auditor, Security Score & Sleek Red Team Banner** | • HTTP Methods & Dangerous Verbs Auditor (`phantom methods`) for PUT, DELETE, TRACE, and WebDAV.<br>• Executive Security Health Score (0-100, A+ to F) with terminal gauge and category breakdown.<br>• Master pipeline expanded to 12 automated stages (`phantom full`).<br>• Streamlined, zero-wrap horizontal terminal ASCII banner and sleek pixel cyber banner asset.<br>• Expanded test suite to **125 passing tests**. |
 | **v1.7.0** | **Multi-Cloud Auditor & Finding Matrix** | • Multi-Cloud Storage Auditor across AWS S3, GCP Storage, and Azure Blob (`phantom cloud`).<br>• Executive & Technical Vulnerability Matrix Table with exact descriptions, real-world impact, and remediation across HTML, Markdown, Text, and Terminal.<br>• Extended master pipeline (`phantom full`) to 11 automated stages.<br>• Interactive HTML filter synchronizes both the table matrix and card views.<br>• Expanded test suite to **107 passing tests**. |
 | **v1.6.0** | **API Recon, Deep CSP & Rich CLI UX** | • Embedded repository banner asset (`assets/banner.png`).<br>• Interactive Command Palette & categorized matrix (`phantom help`).<br>• API reconnaissance engine discovering OpenAPI/Swagger, GraphQL & Actuator endpoints (`phantom api`).<br>• Deep Content-Security-Policy (CSP) evaluator (`'unsafe-inline'`, `'unsafe-eval'`).<br>• Upgraded master pipeline (`phantom full`) to 10 automated steps.<br>• Expanded test suite to **93 passing tests**. |
 | **v1.5.2** | **WAF/CDN & Origin IP Engine** | • Cloud WAF & CDN Edge Proxy detector across 10 major providers.<br>• Zero-request IPv4 CIDR matching for Cloudflare, Fastly, Imperva, Sucuri, Akamai.<br>• Port scanner warning when probing cloud Anycast edge nodes.<br>• Passive backend origin IP discovery via MX, SPF, and unproxied subdomains.<br>• New CLI command `phantom waf` & 9-step master pipeline.<br>• Expanded test suite to **84 passing tests**. |
@@ -248,7 +251,27 @@ phantom vuln --url https://example.com --format md --output report.md
 - 🔵 **Security Headers & Deep CSP**: Missing `HSTS`, `X-Content-Type-Options`, and unsafe CSP directives (`'unsafe-inline'`, `'unsafe-eval'`)
 - 🔵 **Information Disclosure**: Detailed server version leaks in headers
 
-### 4. ☁️ Multi-Cloud Storage Auditor (`phantom cloud`)
+### 4. 🚫 HTTP Methods & Dangerous Verbs Auditor (`phantom methods`)
+
+Audits supported and advertised HTTP methods, probes dangerous verbs (PUT, DELETE, TRACE, WebDAV PROPFIND), and checks HTTP Method Override vulnerabilities with zero false positives.
+
+```bash
+# Audit target URL for dangerous HTTP methods
+phantom methods --url https://example.com
+
+# Audit with custom network timeout
+phantom methods --url https://example.com --timeout 10
+```
+
+**Tested Verbs & Vulnerability Probes:**
+- 🔴 **HTTP PUT (Arbitrary File Upload)**: Benign probe testing whether unauthenticated file creation is permitted, with immediate automated cleanup.
+- 🟠 **HTTP DELETE (Resource Deletion)**: Validates if resource deletion endpoints are exposed without credentials.
+- 🟡 **HTTP TRACE (Cross-Site Tracing / XST)**: Precision canary header echo verification (`CVE-2004-2320`).
+- 🟡 **WebDAV PROPFIND**: Tests for active WebDAV extensions exposing internal file directories and XML multistatus trees.
+- 🔵 **HTTP Method Override**: Probes backend support for `X-HTTP-Method-Override: PUT` and `X-Method-Override` headers.
+- ⚪ **OPTIONS Discovery**: Parses advertised `Allow` and `Public` headers.
+
+### 5. ☁️ Multi-Cloud Storage Auditor (`phantom cloud`)
 
 Discovers exposed, publicly readable, or existing cloud storage buckets and containers across Amazon Web Services (AWS), Google Cloud Storage (GCS), and Microsoft Azure.
 

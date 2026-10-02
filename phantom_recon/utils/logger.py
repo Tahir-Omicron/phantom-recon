@@ -61,22 +61,19 @@ PHANTOM_THEME = Theme(
 
 console = Console(theme=PHANTOM_THEME, legacy_windows=False if sys.platform == "win32" else None)
 
-BANNER = r"""
-[bold red]
-    ____  __  _____    _   ___________  __  ___
-   / __ \/ / / /   |  / | / /_  __/   |/  |/  /
-  / /_/ / /_/ / /| | /  |/ / / / / /|_/ / /|_/ / 
- / ____/ __  / ___ |/ /|  / / / / /  / / /  / /  
-/_/   /_/ /_/_/  |_/_/ |_/ /_/ /_/  /_/_/  /_/   
-[/bold red]
-[bold green]
-    ____  ________________  _   __
-   / __ \/ ____/ ____/ __ \/ | / /
-  / /_/ / __/ / /   / / / /  |/ / 
- / _, _/ /___/ /___/ /_/ / /|  /  
-/_/ |_/_____/\____/\____/_/ |_/   
-[/bold green]
-"""
+BANNER = (
+    "\n"
+    " [bold red]____  _   _    _    _   _ _____ ___  __  __[/bold red]     "
+    "[bold green]____  _____ ____ ___  _   _[/bold green]\n"
+    " [bold red]|  _ \\| | | |  / \\  | \\ | |_   _/ _ \\|  \\/  |[/bold red]    "
+    "[bold green]|  _ \\| ____/ ___/ _ \\| \\ | |[/bold green]\n"
+    " [bold red]| |_) | |_| | / _ \\ |  \\| | | || | | | |\\/| |[/bold red]    "
+    "[bold green]| |_) |  _|| |  | | | |  \\| |[/bold green]\n"
+    " [bold red]|  __/|  _  |/ ___ \\| |\\  | | || |_| | |  | |[/bold red]    "
+    "[bold green]|  _ <| |__| |__| |_| | |\\  |[/bold green]\n"
+    " [bold red]|_|   |_| |_/_/   \\_\\_| \\_| |_| \\___/|_|  |_|[/bold red]    "
+    "[bold green]|_| \\_\\_____\\____\\___/|_| \\_|[/bold green]\n"
+)
 
 
 def print_banner() -> None:
@@ -85,10 +82,11 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.7.0 | Author: Tahir | License: MIT[/dim]\n"
-            "[dim yellow]⚠️  For authorized security testing only[/dim yellow]",
+            "[dim]📌 Version 1.8.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
+            "[dim yellow]⚠️  For authorized security testing & defensive posture assessment only[/dim yellow]",
             border_style="red",
-            padding=(1, 2),
+            box=box.ROUNDED,
+            padding=(0, 2),
         )
     )
     console.print()
@@ -179,6 +177,12 @@ def print_command_palette() -> None:
     )
     table.add_row(
         "🛡️ Vuln & Defense",
+        "methods",
+        "phantom methods -u https://site.com",
+        "HTTP methods auditor (OPTIONS, PUT, DELETE, TRACE/XST, WebDAV & Overrides)."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
         "ssl",
         "phantom ssl -h site.com",
         "SSL/TLS protocol inspector, cipher evaluation & DER binary cert parser."
@@ -203,7 +207,7 @@ def print_command_palette() -> None:
         "📊 Master & Report",
         "full",
         "phantom full -t site.com -o report.html",
-        "Master 11-step full reconnaissance pipeline + interactive report."
+        "Master 12-step full autonomous recon & vulnerability pipeline + HTML report."
     )
     table.add_row(
         "📊 Master & Report",
@@ -225,10 +229,11 @@ def print_command_palette() -> None:
         Panel(
             "[bold white]🚀 Quick-Start Command Cheat Sheet:[/bold white]\n"
             "  [dim]•[/dim] [cyan]phantom vuln -u https://example.com -o report.html[/cyan]  → [dim]Full web vulnerability assessment + HTML dashboard[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom methods -u https://example.com[/cyan]              → [dim]Audit dangerous HTTP verbs (PUT, DELETE, TRACE, WebDAV)[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom cloud -t example.com[/cyan]                        → [dim]Audit AWS S3, GCP & Azure for publicly exposed buckets[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom waf -t example.com[/cyan]                         → [dim]Detect WAF front & audit for leaked origin server IPs[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom api -u https://example.com[/cyan]                         → [dim]Discover OpenAPI/Swagger schemas & GraphQL routes[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                        → [dim]End-to-end 11-stage autonomous penetration test recon[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                        → [dim]End-to-end 12-stage autonomous penetration test recon[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom scan -t 192.168.1.1 -p top100[/cyan]              → [dim]Scan top 100 ports with banner grabbing[/dim]",
             title="[bold yellow]💡 Pro Tips[/bold yellow]",
             border_style="yellow",
@@ -412,3 +417,72 @@ def print_scan_summary(
             border_style="green",
         )
     )
+
+
+def print_security_score_gauge(score_data: dict[str, Any]) -> None:
+    """
+    Render a high-impact terminal security posture gauge scorecard.
+    Displays overall score (0-100), letter grade, executive verdict, and category health bars.
+    """
+    score = score_data.get("score", 100)
+    grade = score_data.get("grade", "A+")
+    verdict = score_data.get("verdict", "Posture Evaluated")
+    color = score_data.get("color", "green")
+    deductions = score_data.get("deductions", {})
+    findings = score_data.get("findings_count", {})
+    categories = score_data.get("category_scores", {})
+
+    # Helper for progress bar
+    def make_bar(pct: int) -> str:
+        filled = max(0, min(10, int(pct / 10)))
+        empty = 10 - filled
+        bar_color = "green" if pct >= 80 else ("yellow" if pct >= 50 else "red")
+        return f"[{bar_color}]{'█' * filled}{'░' * empty}[/{bar_color}] {pct}%"
+
+    cat_display_names = {
+        "web_app": "Web Application & Misconfigurations",
+        "cloud": "Multi-Cloud Storage & Buckets",
+        "crypto_ssl": "Transport Layer & SSL/TLS Ciphers",
+        "identity_dns": "Domain DNS & Email Authentication",
+        "network": "Perimeter & Network Exposure",
+    }
+
+    body = []
+    body.append(
+        f"  [bold white]SECURITY HEALTH SCORE:[/bold white]  [bold {color}][ {score} / 100 ][/bold {color}]    "
+        f"[bold white]GRADE:[/bold white] [{color}][ {grade} ][/{color}]"
+    )
+    body.append(f"  [bold dim]VERDICT:[/bold dim] [{color}]{verdict}[/{color}]\n")
+    body.append("  [bold yellow]Deductions & Findings:[/bold yellow]")
+    body.append(
+        f"    • Critical: [bold red]{findings.get('critical', 0)}[/bold red] (-{deductions.get('critical', 0)} pts)     "
+        f"• Low:           [bold blue]{findings.get('low', 0)}[/bold blue] (-{deductions.get('low', 0)} pts)"
+    )
+    body.append(
+        f"    • High:     [bold red]{findings.get('high', 0)}[/bold red] (-{deductions.get('high', 0)} pts)     "
+        f"• Informational: [dim cyan]{findings.get('info', 0)}[/dim cyan] (0 pts)"
+    )
+    body.append(
+        f"    • Medium:   [bold yellow]{findings.get('medium', 0)}[/bold yellow] (-{deductions.get('medium', 0)} pts)     "
+        f"• Total Deducted: [bold magenta]-{deductions.get('total', 0)} pts[/bold magenta]\n"
+    )
+
+    if categories:
+        body.append("  [bold cyan]Category Health Breakdown:[/bold cyan]")
+        for c_key, c_info in categories.items():
+            name = cat_display_names.get(c_key, c_key.replace('_', ' ').title())
+            c_score = c_info.get("score", 100)
+            c_grade = c_info.get("grade", "A")
+            body.append(f"    • {name:<35} {make_bar(c_score)} ({c_grade})")
+
+    console.print(
+        Panel(
+            "\n".join(body),
+            title="[bold green]🛡️ PHANTOM SECURITY POSTURE SCORECARD[/bold green]",
+            border_style=color if " " not in color else "red",
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+    console.print()
+

@@ -1306,6 +1306,47 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_http_methods(self) -> list[Vulnerability]:
+        """
+        Audit supported HTTP methods and dangerous verbs (PUT, DELETE, TRACE, WebDAV PROPFIND).
+        """
+        logger.info("Auditing HTTP methods and dangerous verbs (PUT, DELETE, TRACE, WebDAV)...")
+        vulns = []
+        try:
+            from phantom_recon.core.http_methods import HTTPMethodsAuditor
+            auditor = HTTPMethodsAuditor(
+                url=self.url,
+                timeout=self.timeout,
+                verify_ssl=self.verify_ssl,
+            )
+            audit_data = auditor.audit_all()
+            for v_data in audit_data.get("vulnerabilities", []):
+                # Avoid duplicate findings
+                if any(existing.method == v_data.get("method") and existing.title == v_data.get("title") for existing in self._vulns):
+                    continue
+                v = Vulnerability(
+                    title=v_data["title"],
+                    severity=v_data["severity"],
+                    cvss_score=v_data.get("cvss_score", 5.0),
+                    description=v_data["description"],
+                    location=v_data.get("location", f"HTTP Method: {v_data.get('method', 'OPTIONS')}"),
+                    url=self.url,
+                    poc_url=v_data.get("poc_url", self.url),
+                    reproduce_curl=v_data.get("reproduce_curl", f"curl -i -k '{self.url}'"),
+                    evidence=v_data.get("evidence", ""),
+                    remediation=v_data.get("remediation", ""),
+                    cve=v_data.get("cve", ""),
+                    category=v_data.get("category", "misconfiguration"),
+                    confidence=v_data.get("confidence", "CONFIRMED"),
+                    method=v_data.get("method", "GET"),
+                )
+                vulns.append(v)
+                self._add_vuln(v)
+        except Exception as e:
+            logger.debug(f"HTTP methods audit error: {e}")
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -1320,6 +1361,7 @@ class VulnerabilityScanner:
         self.check_waf_and_origin_leakage()
         self.check_api_and_docs()
         self.check_cloud_storage()
+        self.check_http_methods()
         self.check_security_headers()
         self.check_cookie_security()
         self.check_cors()
@@ -1354,3 +1396,9 @@ class VulnerabilityScanner:
             if sev in summary:
                 summary[sev] += 1
         return summary
+
+    def get_security_score(self) -> dict[str, Any]:
+        """Calculate and return executive security health score and letter grade."""
+        from phantom_recon.reporting.security_score import calculate_security_score
+        return calculate_security_score([v.to_dict() for v in self._vulns])
+

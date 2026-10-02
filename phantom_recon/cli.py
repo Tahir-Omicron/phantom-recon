@@ -31,6 +31,7 @@ from phantom_recon.utils.logger import (
     print_results_table,
     print_vulnerabilities_matrix,
     print_scan_summary,
+    print_security_score_gauge,
     severity_badge,
 )
 from phantom_recon import __version__
@@ -486,9 +487,72 @@ def vuln(ctx, url, checks, deep, output):
             console.print(f"     [bold green]💡 Fix:[/bold green]         {v.get('remediation', 'N/A')}\n")
 
     summary = scanner.get_summary()
+    score_data = scanner.get_security_score()
+    print_security_score_gauge(score_data)
     info(f"Summary: {summary}")
 
-    _save_output(ctx, {"url": url, "vulnerabilities": results, "summary": summary})
+    _save_output(ctx, {"url": url, "vulnerabilities": results, "summary": summary, "security_score": score_data})
+
+
+# ─── HTTP Methods & Dangerous Verbs Auditor ────────────────────
+@main.command("methods")
+@click.option("--url", "-u", required=True, help="Target application URL.")
+@click.option("--timeout", default=6.0, help="Request timeout (seconds).")
+@click.pass_context
+def methods(ctx, url, timeout):
+    """🚫 HTTP Methods & Dangerous Verbs Auditor (PUT, DELETE, TRACE, WebDAV)."""
+    print_banner()
+    section_header("HTTP Methods & Dangerous Verbs Audit")
+
+    from phantom_recon.core.http_methods import HTTPMethodsAuditor
+    from phantom_recon.reporting.security_score import calculate_security_score
+
+    info(f"Auditing supported verbs and dangerous HTTP methods on: [bold cyan]{url}[/bold cyan]")
+    auditor = HTTPMethodsAuditor(url=url, timeout=timeout)
+    results = auditor.audit_all()
+
+    options = results.get("options", {})
+    advertised = results.get("advertised_methods", [])
+    if advertised:
+        info(f"Advertised Methods: [bold green]{', '.join(advertised)}[/bold green]")
+        if options.get("allow_header"):
+            console.print(f"  • Allow:  [dim]{options.get('allow_header')}[/dim]")
+        if options.get("public_header"):
+            console.print(f"  • Public: [dim]{options.get('public_header')}[/dim]")
+    else:
+        info("OPTIONS request did not return an Allow or Public header.")
+
+    probes = results.get("probes", [])
+    if probes:
+        rows = []
+        for p in probes:
+            status_text = f"HTTP {p['status_code']}" if p['status_code'] > 0 else "N/A"
+            risk_badge = f"[bold red]{p['risk']}[/bold red]" if p['is_vulnerable'] else f"[green]{p['risk']}[/green]"
+            rows.append([
+                p["method"],
+                status_text,
+                risk_badge,
+                p["evidence"][:70],
+            ])
+        print_results_table(
+            f"HTTP Methods Probe Results — {url}",
+            [("Method", "bold"), ("Status", "cyan"), ("Risk Rating", ""), ("Probe Evidence", "dim")],
+            rows,
+        )
+
+    override = results.get("method_override", {})
+    if override.get("supported"):
+        warning(f"HTTP Method Override detected active! ({len(override.get('findings', []))} header permutations)")
+
+    vulns = results.get("vulnerabilities", [])
+    if vulns:
+        print_vulnerabilities_matrix(vulns, f"HTTP Methods Vulnerability Matrix — {url}")
+        score_data = calculate_security_score(vulns)
+        print_security_score_gauge(score_data)
+    else:
+        success("No dangerous unauthenticated HTTP methods (PUT, DELETE, TRACE, WebDAV) detected.")
+
+    _save_output(ctx, results)
 
 
 # ─── Brute Force ─────────────────────────────────────────────────
@@ -718,7 +782,7 @@ def full(ctx, target, output):
 
     # 1. WHOIS
     try:
-        section_header("Step 1/11: WHOIS Lookup")
+        section_header("Step 1/12: WHOIS Lookup")
         from phantom_recon.core.whois_lookup import WhoisLookup
         whois_data = WhoisLookup(target=target).lookup()
         all_results["whois"] = whois_data
@@ -728,7 +792,7 @@ def full(ctx, target, output):
 
     # 2. DNS
     try:
-        section_header("Step 2/11: DNS Enumeration")
+        section_header("Step 2/12: DNS Enumeration")
         from phantom_recon.core.dns_enum import DNSEnumerator
         dns_data = DNSEnumerator(domain=target).enumerate_all()
         all_results["dns"] = dns_data
@@ -738,7 +802,7 @@ def full(ctx, target, output):
 
     # 3. Subdomain Discovery
     try:
-        section_header("Step 3/11: Subdomain Discovery")
+        section_header("Step 3/12: Subdomain Discovery")
         from phantom_recon.core.subdomain import SubdomainFinder
         subs = SubdomainFinder(domain=target, threads=20).find_all()
         all_results["subdomains"] = subs
@@ -748,14 +812,14 @@ def full(ctx, target, output):
 
     # 4. WAF & Origin IP Audit
     try:
-        section_header("Step 4/11: WAF & Origin IP Leakage Audit")
+        section_header("Step 4/12: WAF & Origin IP Leakage Audit")
         from phantom_recon.core.waf_detector import WAFDetector
         waf_data = WAFDetector(target=target).run_full_waf_analysis()
         all_results["waf"] = waf_data
         if waf_data.get("has_waf"):
             warning(f"Target is fronted by {waf_data.get('waf_name')} CDN/WAF!")
             if waf_data.get("origin_leakage", {}).get("leakage_detected"):
-                error(f"🚨 Potential unproxied origin server IP leakage detected!")
+                error("🚨 Potential unproxied origin server IP leakage detected!")
         else:
             success("No cloud WAF edge proxy detected (direct host)")
     except Exception as e:
@@ -763,7 +827,7 @@ def full(ctx, target, output):
 
     # 5. Cloud Storage Audit
     try:
-        section_header("Step 5/11: Cloud Storage & Bucket Leakage Audit")
+        section_header("Step 5/12: Cloud Storage & Bucket Leakage Audit")
         from phantom_recon.core.cloud_auditor import CloudAuditor
         cloud_results = CloudAuditor(target=target, threads=20).run_cloud_audit()
         all_results["cloud_storage"] = cloud_results
@@ -778,7 +842,7 @@ def full(ctx, target, output):
 
     # 6. Port Scan
     try:
-        section_header("Step 6/11: Port Scanning")
+        section_header("Step 6/12: Port Scanning")
         from phantom_recon.core.scanner import PortScanner
         scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
         all_results["ports"] = scan_results.get("ports", {})
@@ -788,7 +852,7 @@ def full(ctx, target, output):
 
     # 7. Web Reconnaissance
     try:
-        section_header("Step 7/11: Web Application Reconnaissance")
+        section_header("Step 7/12: Web Application Reconnaissance")
         from phantom_recon.core.web_recon import WebRecon
         url = f"https://{target}" if not target.startswith("http") else target
         web_results = WebRecon(url=url).run_full_recon()
@@ -801,7 +865,7 @@ def full(ctx, target, output):
 
     # 8. API Discovery
     try:
-        section_header("Step 8/11: API & Architecture Discovery")
+        section_header("Step 8/12: API & Architecture Discovery")
         from phantom_recon.core.api_scanner import APIScanner
         url = f"https://{target}" if not target.startswith("http") else target
         api_results = APIScanner(url=url).scan_endpoints()
@@ -812,7 +876,7 @@ def full(ctx, target, output):
 
     # 9. Header Analysis
     try:
-        section_header("Step 9/11: Header Analysis")
+        section_header("Step 9/12: Header Analysis")
         from phantom_recon.core.header_analyzer import HeaderAnalyzer
         url = f"https://{target}" if not target.startswith("http") else target
         header_data = HeaderAnalyzer(url=url).analyze()
@@ -823,7 +887,7 @@ def full(ctx, target, output):
 
     # 10. SSL Analysis
     try:
-        section_header("Step 10/11: SSL/TLS Analysis")
+        section_header("Step 10/12: SSL/TLS Analysis")
         from phantom_recon.core.ssl_analyzer import SSLAnalyzer
         ssl_data = SSLAnalyzer(host=target).analyze()
         all_results["ssl"] = ssl_data
@@ -831,14 +895,33 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"SSL analysis failed: {e}")
 
-    # 11. Vulnerability Scan
+    # 11. HTTP Methods & Dangerous Verbs Audit
     try:
-        section_header("Step 11/11: Vulnerability Scan")
+        section_header("Step 11/12: HTTP Methods & Dangerous Verbs Audit")
+        from phantom_recon.core.http_methods import HTTPMethodsAuditor
+        url = f"https://{target}" if not target.startswith("http") else target
+        methods_data = HTTPMethodsAuditor(url=url).audit_all()
+        all_results["http_methods"] = methods_data
+        adv = methods_data.get("advertised_methods", [])
+        if adv:
+            info(f"Discovered advertised methods: [bold green]{', '.join(adv)}[/bold green]")
+        d_vulns = methods_data.get("vulnerabilities", [])
+        if d_vulns:
+            warning(f"Discovered {len(d_vulns)} insecure HTTP method findings.")
+        else:
+            success("HTTP method audit clean: No dangerous verbs exposed.")
+    except Exception as e:
+        warning(f"HTTP methods audit failed: {e}")
+
+    # 12. Vulnerability Scan
+    try:
+        section_header("Step 12/12: Vulnerability Scan & Matrix Analysis")
         from phantom_recon.core.vuln_scanner import VulnerabilityScanner
         url = f"https://{target}" if not target.startswith("http") else target
-        vuln_data = VulnerabilityScanner(url=url).scan_all()
+        scanner = VulnerabilityScanner(url=url)
+        vuln_data = scanner.scan_all()
         all_results["vulnerabilities"] = vuln_data
-        success(f"Found {len(vuln_data)} vulnerabilities")
+        success(f"Found {len(vuln_data)} verified vulnerabilities")
         if vuln_data:
             print_vulnerabilities_matrix(vuln_data, f"Vulnerability Assessment & Explanations Matrix — {target}")
             console.print("[bold yellow]📍 DETAILED REPRODUCTION PROOF-OF-CONCEPT & DIRECT ACCESS:[/bold yellow]\n")
@@ -852,6 +935,12 @@ def full(ctx, target, output):
                 if v.get("evidence"):
                     console.print(f"     [dim]📋 Evidence:    {v.get('evidence')[:120]}...[/dim]")
                 console.print(f"     [bold green]💡 Fix:[/bold green]         {v.get('remediation', 'N/A')}\n")
+
+        # Security Posture Scorecard
+        from phantom_recon.reporting.security_score import calculate_security_score
+        score_data = calculate_security_score(vuln_data)
+        all_results["security_score"] = score_data
+        print_security_score_gauge(score_data)
     except Exception as e:
         warning(f"Vulnerability scan failed: {e}")
 

@@ -672,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.7.0 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.8.0 (Zero False Positive)</strong></span>
                 </div>
             </div>
 
@@ -970,6 +970,50 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                         <td><span class="badge badge-{{ f.get('severity', 'info')|lower }}">{{ f.get('severity') }}</span></td>
                         <td><a href="{{ f.get('url') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan); font-size: 0.9em;">{{ f.get('url') }}</a></td>
                         <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ f.get('evidence', '')[:80] }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <!-- HTTP Methods & Dangerous Verbs Section -->
+        {% if data.get('http_methods') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>🚫 HTTP Methods & Dangerous Verbs Audit</span>
+                <span class="badge" style="background: rgba(0, 229, 255, 0.15); border: 1px solid var(--neon-cyan); color: var(--neon-cyan);">
+                    {{ data.get('http_methods', {}).get('advertised_methods', [])|length }} advertised methods
+                </span>
+            </div>
+            <p style="color: var(--text-sub); font-size: 0.9em; margin-bottom: 16px;">
+                <strong>Advertised Methods:</strong> {{ data.get('http_methods', {}).get('advertised_methods', [])|join(', ') or 'None reported' }}
+                {% if data.get('http_methods', {}).get('options', {}).get('allow_header') %}
+                | <strong>Allow Header:</strong> <code>{{ data.get('http_methods', {}).get('options', {}).get('allow_header') }}</code>
+                {% endif %}
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tested Method</th>
+                        <th>Status Code</th>
+                        <th>Risk Assessment</th>
+                        <th>Evidence / Response Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in data.get('http_methods', {}).get('probes', []) %}
+                    <tr>
+                        <td><code style="color: var(--neon-cyan); font-weight: 700;">{{ p.get('method') }}</code></td>
+                        <td><code>HTTP {{ p.get('status_code') }}</code></td>
+                        <td>
+                            {% if p.get('is_vulnerable') %}
+                            <span class="badge" style="background: rgba(255, 23, 68, 0.2); color: var(--neon-red); border: 1px solid var(--neon-red);">🚨 {{ p.get('risk') }}</span>
+                            {% else %}
+                            <span class="badge" style="background: rgba(0, 230, 118, 0.15); color: var(--neon-green); border: 1px solid var(--neon-green);">✓ {{ p.get('risk') }}</span>
+                            {% endif %}
+                        </td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ p.get('evidence', '') }}</span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
