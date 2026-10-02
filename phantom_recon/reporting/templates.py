@@ -672,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.5.2 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.6.0 (Zero False Positive)</strong></span>
                 </div>
             </div>
 
@@ -851,6 +851,36 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                 </tbody>
             </table>
             {% endif %}
+        </section>
+        {% endif %}
+
+        <!-- API & Documentation Discovery Section -->
+        {% if data.get('api_endpoints') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>🔌 Discovered API Schemas & Documentation Portals</span>
+                <span class="badge" style="background: rgba(0, 229, 255, 0.15); border: 1px solid var(--neon-cyan); color: var(--neon-cyan);">{{ data.get('api_endpoints', [])|length }} endpoints active</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>API Path</th>
+                        <th>Architecture Type</th>
+                        <th>Status</th>
+                        <th>Evidence / Response Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ep in data.get('api_endpoints', []) %}
+                    <tr>
+                        <td><code style="color: var(--neon-cyan); font-weight: 700;">{{ ep.get('path') }}</code></td>
+                        <td><span class="badge" style="background: rgba(213, 0, 249, 0.15); color: #ea80fc; border: 1px solid var(--neon-purple);">{{ ep.get('type') }}</span></td>
+                        <td><span class="badge badge-verified">{{ ep.get('status_code', 200) }}</span></td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ ep.get('evidence') }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </section>
         {% endif %}
 

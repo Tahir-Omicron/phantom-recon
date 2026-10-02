@@ -200,6 +200,9 @@ class HeaderAnalyzer:
         # ── Calculate grade ──
         self._grade = self._calculate_grade()
 
+        # ── Deep CSP Evaluation ──
+        csp_eval = self.evaluate_csp_deep(headers.get("Content-Security-Policy", ""))
+
         return {
             "url": self.url,
             "grade": self._grade,
@@ -208,8 +211,64 @@ class HeaderAnalyzer:
             "headers_checked": len(self._checks),
             "secure_count": sum(1 for c in self._checks if c.secure),
             "insecure_count": sum(1 for c in self._checks if not c.secure),
+            "csp_analysis": csp_eval,
             "checks": [c.to_dict() for c in self._checks],
             "all_headers": dict(resp.headers),
+        }
+
+    @staticmethod
+    def evaluate_csp_deep(csp: str) -> dict[str, Any]:
+        """
+        Deep security evaluation of a Content-Security-Policy string.
+        Pinpoints bypass vectors, insecure wildcards, and missing guards.
+        """
+        if not csp:
+            return {"configured": False, "score": 0, "issues": ["No Content-Security-Policy header configured."]}
+
+        directives: dict[str, list[str]] = {}
+        for part in csp.split(";"):
+            part = part.strip()
+            if not part:
+                continue
+            tokens = part.split()
+            dir_name = tokens[0].lower()
+            dir_values = [t.lower() for t in tokens[1:]]
+            directives[dir_name] = dir_values
+
+        issues: list[str] = []
+        score = 100
+
+        script_src = directives.get("script-src", directives.get("default-src", []))
+        if not script_src:
+            issues.append("Missing both 'script-src' and 'default-src' directives.")
+            score -= 30
+        else:
+            if "'unsafe-inline'" in script_src:
+                issues.append("'script-src' contains 'unsafe-inline' — vulnerable to XSS injection.")
+                score -= 25
+            if "'unsafe-eval'" in script_src:
+                issues.append("'script-src' contains 'unsafe-eval' — allows dynamic JavaScript execution.")
+                score -= 15
+            if "*" in script_src:
+                issues.append("'script-src' allows wildcard '*' source — unrestricted script origin.")
+                score -= 25
+
+        object_src = directives.get("object-src", directives.get("default-src", []))
+        if not object_src or "'none'" not in object_src:
+            issues.append("Missing 'object-src 'none'' — legacy plugin injection possible.")
+            score -= 15
+
+        if "base-uri" not in directives:
+            issues.append("Missing 'base-uri' directive — document base URL can be hijacked via <base href>.")
+            score -= 10
+
+        return {
+            "configured": True,
+            "raw_policy": csp,
+            "directives_count": len(directives),
+            "score": max(0, score),
+            "is_strict": len(issues) == 0,
+            "issues": issues,
         }
 
     def _calculate_grade(self) -> str:

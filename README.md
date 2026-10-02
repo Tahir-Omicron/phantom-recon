@@ -5,20 +5,20 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.5.2)</strong>
+  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.6.0)</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
-  <a href="#modules"><img src="https://img.shields.io/badge/modules-11+-red.svg?style=for-the-badge" alt="11+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-84%20passed-brightgreen.svg?style=for-the-badge" alt="84 Tests Passing"/></a>
+  <a href="#modules"><img src="https://img.shields.io/badge/modules-12+-red.svg?style=for-the-badge" alt="12+ Modules"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-93%20passed-brightgreen.svg?style=for-the-badge" alt="93 Tests Passing"/></a>
   <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v152">What's New in v1.5.2</a> •
+  <a href="#whats-new-in-v160">What's New in v1.6.0</a> •
   <a href="#release-history">Release History</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
@@ -30,28 +30,35 @@
 
 ---
 
-## 🚀 What's New in v1.5.2
+## 🚀 What's New in v1.6.0
 
-- 🛡️ **Web Application Firewall (WAF) & Cloud CDN Edge Proxy Detection**:
-  - Automatically identifies whether target domains or resolved IP addresses belong to cloud security edge proxies (Cloudflare, Akamai, AWS CloudFront / AWS WAF, Imperva / Incapsula, Fastly, Sucuri CloudProxy, F5 BIG-IP, ModSecurity, Azure Front Door, Barracuda).
-  - Precompiled IPv4 CIDR blocks allow instant zero-latency network matching before firing any network requests.
-- ⚠️ **Edge Proxy Reconnaissance Protection ("Don't Hit a Wall")**:
-  - Automatically warns operators when port scanning target IPs (`phantom scan`): prevents false-alarm scans where open ports (80, 443, 8080, 8443) belong to cloud Anycast edge nodes rather than the client's internal origin server.
-- 🚨 **Unproxied Backend Origin IP Leakage Audit (WAF Bypass Vector)**:
-  - Audits DNS MX records, SPF TXT `ip4:` declarations, and common unproxied subdomains (`mail`, `direct`, `origin`, `ftp`, `cpanel`, `dev`, `vpn`).
-  - Flags direct backend server IPs that bypass cloud WAF inspection (CWE-200) as High-severity findings with reproducible cURL commands and firewall remediation guidance.
-- 💻 **Dedicated CLI Command (`phantom waf`) & Full Pipeline Integration**:
-  - Run standalone WAF audits with `phantom waf -t <target>`.
-  - Upgraded master reconnaissance pipeline (`phantom full`) into a comprehensive **9-step audit**.
-- 🧪 **Comprehensive Automated Verification (84 Tests Passing)**:
-  - 84 automated unit tests verifying CIDR matching, HTTP fingerprinting, origin leakage discovery, and report generation.
+- 🖼️ **Official High-Definition Repository Banner**:
+  - Embedded high-resolution cybersecurity graphic asset (`assets/banner.png`) directly in the root repository.
+- 💻 **Interactive Rich Command Palette & Terminal UX (`phantom help`)**:
+  - Replaced raw, cluttered CLI parameter dumps with an elegant, categorized Command Center.
+  - Features grouped matrices (🌐 *Surface Recon*, 🛡️ *Vuln & Defense*, ⚙️ *Network & Auth*, 📊 *Master & Report*), clear syntax examples, and an integrated **Pro Tips Quick-Start Cheat Sheet**.
+  - Accessible via `phantom help`, `phantom --help`, or running `phantom` with no arguments.
+- ⚡ **API & Documentation Reconnaissance Engine (`phantom api`)**:
+  - Discovers exposed API schemas and definitions (`/swagger.json`, `/v2/api-docs`, `/openapi.json`, `/api-docs`).
+  - Detects interactive documentation portals (Swagger UI, ReDoc).
+  - Probes GraphQL endpoints (`/graphql`, `/api/graphql`) with active schema queries.
+  - Audits sensitive Spring Boot Actuator endpoints (`/actuator/health`, `/actuator/env`, `/actuator/metrics`).
+  - Employs canary soft-404 profiling to eliminate false-positive discoveries on Single Page Applications (SPAs).
+- 🛡️ **Deep Content-Security-Policy (CSP) Security Evaluator**:
+  - Real-time audit of CSP directives (`script-src`, `object-src`, `base-uri`).
+  - Detects unsafe bypass primitives (`'unsafe-inline'`, `'unsafe-eval'`, wildcard scripts `*`).
+- 🎯 **10-Step Full Autonomous Reconnaissance Pipeline (`phantom full`)**:
+  - Extended master pipeline with API schema discovery and CSP auditing for complete surface coverage.
+- 🧪 **Comprehensive Automated Verification (93 Tests Passing)**:
+  - 93 unit and laboratory tests with 100% pass rate.
 
 ---
 
-## 📜 Release History & Changelog (v1.0.0 — v1.5.2)
+## 📜 Release History & Changelog (v1.0.0 — v1.6.0)
 
 | Version | Release Focus | Key Additions & Fixes |
 | :--- | :--- | :--- |
+| **v1.6.0** | **API Recon, Deep CSP & Rich CLI UX** | • Embedded repository banner asset (`assets/banner.png`).<br>• Interactive Command Palette & categorized matrix (`phantom help`).<br>• API reconnaissance engine discovering OpenAPI/Swagger, GraphQL & Actuator endpoints (`phantom api`).<br>• Deep Content-Security-Policy (CSP) evaluator (`'unsafe-inline'`, `'unsafe-eval'`).<br>• Upgraded master pipeline (`phantom full`) to 10 automated steps.<br>• Expanded test suite to **93 passing tests**. |
 | **v1.5.2** | **WAF/CDN & Origin IP Engine** | • Cloud WAF & CDN Edge Proxy detector across 10 major providers.<br>• Zero-request IPv4 CIDR matching for Cloudflare, Fastly, Imperva, Sucuri, Akamai.<br>• Port scanner warning when probing cloud Anycast edge nodes.<br>• Passive backend origin IP discovery via MX, SPF, and unproxied subdomains.<br>• New CLI command `phantom waf` & 9-step master pipeline.<br>• Expanded test suite to **84 passing tests**. |
 | **v1.5.1** | **Precision Hardening & UX** | • Subdomain DMARC inheritance fallback (RFC 7489).<br>• Soft-404 guard on HTTP TRACE (XST) checking.<br>• Enhanced CLI outputs for DNS email defense and Web Recon JS secrets.<br>• Expanded test suite to **69 passing tests**. |
 | **v1.5.0** | **Email Security, DER SSL & JS Recon** | • DNS Email Spoofing Defense (automated SPF & DMARC policy auditor).<br>• High-fidelity DER certificate binary parser (`cryptography.x509`) fixing Python `CERT_NONE` empty dictionary limitation.<br>• Cross-Site Tracing (XST / HTTP TRACE) detection.<br>• JavaScript crawler extracting hidden API routes and exposed credentials (Google API keys, AWS keys, Slack webhooks, RSA keys).<br>• RFC 9116 `security.txt` parser.<br>• Fixed WHOIS offset-aware timezone datetime subtraction crash. |
@@ -75,6 +82,9 @@
 
 | Feature | Description |
 |---------|-------------|
+| 🖼️ **Repository Visual Branding** | High-definition repository banner and crisp identity asset (`assets/banner.png`). |
+| 💻 **Rich Command Palette & Matrix** | Interactive categorized operational table and cheat sheet (`phantom help`) built for cybersecurity pros and students. |
+| ⚡ **API & Schema Reconnaissance** | Discovers OpenAPI/Swagger JSON schemas, Swagger UI/ReDoc portals, GraphQL endpoints, and Spring Boot Actuators. |
 | 🛡️ **Zero False Positive Engine** | Soft-404 canary profiling, semantic regex matching, and dual-origin CORS reflection verification. |
 | 🍪 **Cookie Security Auditor** | Identifies missing `Secure`, `HttpOnly`, and `SameSite` attributes on sensitive session cookies. |
 | 🚨 **Subdomain Takeover Detector** | Detects dangling CNAME records pointing to unclaimed GitHub Pages, S3 buckets, and Heroku apps. |
@@ -104,13 +114,16 @@ cd phantom-recon
 # Install in development mode
 pip install -e ".[dev]"
 
-# Run your first port scan
-phantom scan --target 192.168.1.1 --ports 1-1000
+# View the interactive command palette & cheat sheet
+phantom help
+
+# Run API schema and documentation discovery
+phantom api --url https://example.com
 
 # Run a vulnerability audit with interactive HTML report
 phantom vuln --url https://example.com --output audit_report.html
 
-# Run the complete 8-step full reconnaissance pipeline
+# Run the complete 10-step full reconnaissance pipeline
 phantom full --target example.com --output full_report.html
 ```
 
@@ -223,16 +236,36 @@ phantom vuln --url https://example.com --format md --output report.md
 
 **Verified Checks:**
 - 🔴 **Sensitive File Disclosure**: `.env`, `.git/HEAD`, `.git/config`, `phpinfo.php`, `backup.sql`, `.DS_Store`
+- 🔴 **Exposed API Schemas & Endpoints**: Swagger JSON, OpenAPI definitions, exposed Spring Boot Actuators
 - 🔴 **Reflected XSS**: Real HTML-context reflection without encoding
 - 🟠 **CORS Misconfigurations**: Dual-origin reflection, wildcard credential sharing, `Origin: null` trust
 - 🟡 **Clickjacking**: Missing both `X-Frame-Options` and `frame-ancestors` on HTML pages
 - 🟡 **Insecure Directory Listing**: Server-indexed `/uploads/`, `/static/`, `/backup/` paths
 - 🟡 **Open Redirect**: Validated external redirection targets
 - 🔵 **Cookie Security**: Missing `Secure`, `HttpOnly`, and `SameSite` flags
-- 🔵 **Security Headers**: Missing `HSTS`, `CSP`, `X-Content-Type-Options`, `COOP`, `COEP`
+- 🔵 **Security Headers & Deep CSP**: Missing `HSTS`, `X-Content-Type-Options`, and unsafe CSP directives (`'unsafe-inline'`, `'unsafe-eval'`)
 - 🔵 **Information Disclosure**: Detailed server version leaks in headers
 
-### 4. 🌐 Web Reconnaissance (`phantom recon`)
+### 4. ⚡ API & Schema Reconnaissance (`phantom api`)
+
+Discovers exposed API schemas, interactive documentation portals, GraphQL endpoints, and Spring Boot Actuators.
+
+```bash
+# Discover exposed API schemas, documentation, and GraphQL
+phantom api --url https://example.com
+
+# Audit API with custom timeout and export to JSON
+phantom api --url https://api.example.com --timeout 15 --output api_findings.json
+```
+
+**Discovered Endpoints & Capabilities:**
+- 📜 **OpenAPI / Swagger Schemas**: `/swagger.json`, `/v2/api-docs`, `/v3/api-docs`, `/openapi.json`, `/api-docs`
+- 🖥️ **Interactive Documentation Portals**: Swagger UI (`/swagger-ui.html`, `/docs`), ReDoc (`/redoc`)
+- 🔮 **GraphQL Endpoints**: `/graphql`, `/api/graphql`, `/v1/graphql` (verified via active schema probe query `{__typename}`)
+- ⚙️ **Spring Boot Actuators**: `/actuator/health`, `/actuator/env`, `/actuator/metrics`, `/actuator/beans`
+- 🛡️ **Canary Soft-404 Validation**: Automatically profiles random endpoints (`/__phantom_canary_probe__`) to filter out false positives on Single Page Applications (SPAs).
+
+### 5. 🌐 Web Reconnaissance (`phantom recon`)
 
 Web application fingerprinting and surface mapping.
 
@@ -247,7 +280,7 @@ phantom recon --url https://example.com --tech
 phantom recon --url https://example.com --dirs
 ```
 
-### 5. 🔎 Subdomain Discovery (`phantom subdomain`)
+### 6. 🔎 Subdomain Discovery (`phantom subdomain`)
 
 Find subdomains and detect takeover risks.
 
@@ -262,7 +295,7 @@ phantom subdomain --domain example.com --ct-logs
 phantom subdomain --domain example.com --wordlist wordlists/subdomains.txt --threads 50
 ```
 
-### 6. 📡 DNS Enumeration (`phantom dns`)
+### 7. 📡 DNS Enumeration (`phantom dns`)
 
 Enumerate DNS records, SPF/DMARC anti-spoofing policies, and test for zone transfers.
 
@@ -277,7 +310,7 @@ phantom dns --domain example.com --type a,mx,ns,txt
 phantom dns --domain example.com --zone-transfer
 ```
 
-### 7. 🔐 SSL/TLS Cryptographic Analysis (`phantom ssl`)
+### 8. 🔐 SSL/TLS Cryptographic Analysis (`phantom ssl`)
 
 Inspect SSL/TLS certificate chains, protocols, and ciphers.
 
@@ -289,7 +322,7 @@ phantom ssl --host example.com
 phantom ssl --host example.com --port 8443
 ```
 
-### 8. 🔑 Multi-Protocol Brute Force (`phantom brute`)
+### 9. 🔑 Multi-Protocol Brute Force (`phantom brute`)
 
 Rate-limited authentication auditing.
 
@@ -304,7 +337,7 @@ phantom brute --target ftp.example.com --service ftp --userlist users.txt --pass
 phantom brute --target https://example.com/admin --service http --userlist users.txt --passlist passwords.txt
 ```
 
-### 9. 🗺️ Network Mapper (`phantom network`)
+### 10. 🗺️ Network Mapper (`phantom network`)
 
 Local network host discovery and traceroute.
 
@@ -316,7 +349,7 @@ phantom network --target 192.168.1.0/24 --discover
 phantom network --target 8.8.8.8 --traceroute
 ```
 
-### 10. 📋 WHOIS Intelligence (`phantom whois`)
+### 11. 📋 WHOIS Intelligence (`phantom whois`)
 
 Registrar, creation, expiration, and nameserver lookup.
 
@@ -324,7 +357,16 @@ Registrar, creation, expiration, and nameserver lookup.
 phantom whois --target example.com
 ```
 
-### 11. 📊 Multi-Format Report Generator (`phantom report`)
+### 12. 💻 Interactive Rich Command Palette (`phantom help`)
+
+Renders a categorized command matrix and operational cheat sheet designed for fast triage:
+
+```bash
+# Launch interactive command palette
+phantom help
+```
+
+### 13. 📊 Multi-Format Report Generator (`phantom report`)
 
 Convert scan data into professional reports.
 
@@ -342,24 +384,25 @@ phantom report --input scan.json --format md --output report.md
 phantom report --input scan.json --format txt --output report.txt
 ```
 
-### 12. 🎯 Master Recon Pipeline (`phantom full`)
+### 14. 🎯 Master Recon Pipeline (`phantom full`)
 
-Execute all 9 specialized modules in sequence:
+Execute all 10 specialized reconnaissance and audit phases in sequence:
 
 ```bash
 phantom full --target example.com --output phantom_report.html
 ```
 
-**Pipeline Steps:**
+**Pipeline Steps (10 Automated Stages):**
 1. WHOIS Lookup
-2. DNS Enumeration
+2. DNS Enumeration & Anti-Spoofing Policy Audit
 3. Subdomain Discovery & Takeover Inspection
 4. WAF & Origin IP Leakage Audit (Edge proxy identification & bypass check)
 5. Port Scanning & Service Identification
 6. Web Application Reconnaissance (Tech stack, directories, forms)
-7. Security Header Analysis
-8. SSL/TLS Cryptographic Analysis
-9. Ultra-Precision Vulnerability Scan (Zero False Positive)
+7. API Schema & Documentation Reconnaissance (OpenAPI, GraphQL, Actuators)
+8. Security Header & Deep CSP Directive Analysis
+9. SSL/TLS Cryptographic Analysis
+10. Ultra-Precision Vulnerability Scan (Zero False Positive)
 
 ---
 
@@ -394,14 +437,15 @@ pytest tests/ -v
 ```
 ============================= test session starts =============================
 platform win32 -- Python 3.12.10, pytest-9.1.1
-collected 84 items
+collected 93 items
 
-tests/test_scanner.py .............                                      [ 15%]
-tests/test_validators.py ..............................                  [ 51%]
-tests/test_vuln_scanner.py ..........................                    [ 82%]
+tests/test_scanner.py .............                                      [ 14%]
+tests/test_v160_features.py .........                                    [ 24%]
+tests/test_validators.py ..............................                  [ 56%]
+tests/test_vuln_scanner.py ..........................                    [ 84%]
 tests/test_waf_detector.py ..............                                [100%]
 
-============================= 84 passed in 2.89s ==============================
+============================= 93 passed in 2.75s ==============================
 ```
 
 ---
@@ -410,6 +454,8 @@ tests/test_waf_detector.py ..............                                [100%]
 
 ```
 phantom-recon/
+├── 🖼️ assets/
+│   └── banner.png                  # Official repository visual banner
 ├── 📄 pyproject.toml               # Build configuration & dependency definitions
 ├── 📄 README.md                    # Documentation & user guide
 ├── 📄 LICENSE                      # MIT License
@@ -417,24 +463,25 @@ phantom-recon/
 ├── 📄 SECURITY.md                  # Responsible disclosure policy
 │
 ├── 🔥 phantom_recon/               # Core framework package
-│   ├── __init__.py                 # Version & package exports (v1.5.2)
-│   ├── cli.py                      # Click CLI entry point
+│   ├── __init__.py                 # Version & package exports (v1.6.0)
+│   ├── cli.py                      # Click CLI entry point & PhantomGroup help formatter
 │   │
 │   ├── 🧠 core/                    # Specialized scanning engines
 │   │   ├── scanner.py              # Multi-threaded TCP/UDP port scanner (with WAF proxy alert)
 │   │   ├── waf_detector.py         # Cloud WAF/CDN detector & unproxied origin IP engine
+│   │   ├── api_scanner.py          # OpenAPI/Swagger, GraphQL & Actuator discovery engine
 │   │   ├── vuln_scanner.py         # Zero False Positive Vulnerability Scanner
 │   │   ├── web_recon.py            # Web application reconnaissance & fingerprinting
 │   │   ├── subdomain.py            # Subdomain discovery & takeover detection
 │   │   ├── dns_enum.py             # DNS enumeration & zone transfer audit
-│   │   ├── header_analyzer.py      # HTTP security header grader
+│   │   ├── header_analyzer.py      # HTTP security header & Deep CSP grader
 │   │   ├── ssl_analyzer.py         # SSL/TLS cryptographic cipher inspector
 │   │   ├── network.py              # ARP discovery & traceroute mapper
 │   │   ├── brute.py                # Multi-protocol credential auditor
 │   │   └── whois_lookup.py         # Domain & IP WHOIS intelligence
 │   │
 │   ├── 🛠️ utils/                   # Shared utilities
-│   │   ├── logger.py               # Rich terminal formatting & tables
+│   │   ├── logger.py               # Rich terminal formatting & command matrix palette
 │   │   ├── validators.py           # Strict IP/CIDR/Domain/URL validators
 │   │   └── config.py               # YAML configuration loader
 │   │
@@ -442,8 +489,9 @@ phantom-recon/
 │       ├── report_generator.py     # HTML, CSV, Markdown, JSON, TXT engine
 │       └── templates.py            # Dark glassmorphism dashboard template
 │
-├── 🧪 tests/                       # Automated test suite
+├── 🧪 tests/                       # Automated test suite (93 unit tests)
 │   ├── test_scanner.py             # Port scanner unit tests
+│   ├── test_v160_features.py       # API scanner, CSP & command palette tests
 │   ├── test_validators.py          # Input validator tests
 │   ├── test_vuln_scanner.py        # Zero false positive & reporting tests
 │   └── test_waf_detector.py        # WAF CIDR, signature & origin leak tests

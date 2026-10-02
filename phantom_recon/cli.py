@@ -21,6 +21,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from phantom_recon.utils.logger import (
     print_banner,
+    print_command_palette,
     console,
     section_header,
     success,
@@ -35,8 +36,16 @@ from phantom_recon import __version__
 from phantom_recon.utils.config import load_or_create_config
 
 
+class PhantomGroup(click.Group):
+    """Custom Click Group with stylized Rich Command Palette."""
+    def get_help(self, ctx):
+        print_banner()
+        print_command_palette()
+        return ""
+
+
 # ─── Main CLI Group ─────────────────────────────────────────────
-@click.group(invoke_without_command=True)
+@click.group(cls=PhantomGroup, invoke_without_command=True)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output.")
 @click.option("--no-color", is_flag=True, help="Disable colored output.")
 @click.option("--config", "-c", type=str, default=None, help="Path to config file.")
@@ -54,7 +63,15 @@ def main(ctx, verbose, no_color, config, output, output_format):
 
     if ctx.invoked_subcommand is None:
         print_banner()
-        click.echo(ctx.get_help())
+        print_command_palette()
+
+
+# ─── Interactive Command Palette ────────────────────────────────
+@main.command(name="help")
+def help_cmd():
+    """📖 Display the interactive command palette & quick syntax cheat sheet."""
+    print_banner()
+    print_command_palette()
 
 
 # ─── Port Scan ──────────────────────────────────────────────────
@@ -174,6 +191,43 @@ def waf(ctx, target, timeout):
         success("No direct backend origin IP leaks detected in common DNS/subdomain records.")
 
     _save_output(ctx, results)
+
+
+# ─── API & Documentation Discovery ─────────────────────────────
+@main.command()
+@click.option("--url", "-u", required=True, help="Target application URL.")
+@click.option("--timeout", default=6.0, help="Request timeout (seconds).")
+@click.pass_context
+def api(ctx, url, timeout):
+    """🔍 API endpoint discovery (Swagger/OpenAPI, GraphQL & Spring Actuators)."""
+    print_banner()
+    section_header("API & Architecture Discovery")
+
+    from phantom_recon.core.api_scanner import APIScanner
+
+    scanner = APIScanner(url=url, timeout=timeout)
+    endpoints = scanner.scan_endpoints()
+
+    if endpoints:
+        rows = []
+        for ep in endpoints:
+            rows.append([
+                ep.get("path", ""),
+                ep.get("type", ""),
+                str(ep.get("status_code", 200)),
+                ep.get("evidence", "")[:60],
+            ])
+
+        print_results_table(
+            f"API Endpoints Discovered — {url}",
+            [("Path", "bold cyan"), ("Architecture Type", "yellow"), ("Status", "green"), ("Details / Evidence", "dim")],
+            rows,
+        )
+        success(f"Discovered [bold]{len(endpoints)}[/bold] exposed API schemas / documentation interfaces.")
+    else:
+        info("No standard public API documentation or Swagger schemas discovered.")
+
+    _save_output(ctx, {"target": url, "api_endpoints": endpoints})
 
 
 
@@ -635,7 +689,7 @@ def full(ctx, target, output):
 
     # 3. Subdomain Discovery
     try:
-        section_header("Step 3/9: Subdomain Discovery")
+        section_header("Step 3/10: Subdomain Discovery")
         from phantom_recon.core.subdomain import SubdomainFinder
         subs = SubdomainFinder(domain=target, threads=20).find_all()
         all_results["subdomains"] = subs
@@ -645,7 +699,7 @@ def full(ctx, target, output):
 
     # 4. WAF & Origin IP Audit
     try:
-        section_header("Step 4/9: WAF & Origin IP Leakage Audit")
+        section_header("Step 4/10: WAF & Origin IP Leakage Audit")
         from phantom_recon.core.waf_detector import WAFDetector
         waf_data = WAFDetector(target=target).run_full_waf_analysis()
         all_results["waf"] = waf_data
@@ -660,7 +714,7 @@ def full(ctx, target, output):
 
     # 5. Port Scan
     try:
-        section_header("Step 5/9: Port Scanning")
+        section_header("Step 5/10: Port Scanning")
         from phantom_recon.core.scanner import PortScanner
         scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
         all_results["ports"] = scan_results.get("ports", {})
@@ -670,7 +724,7 @@ def full(ctx, target, output):
 
     # 6. Web Reconnaissance
     try:
-        section_header("Step 6/9: Web Application Reconnaissance")
+        section_header("Step 6/10: Web Application Reconnaissance")
         from phantom_recon.core.web_recon import WebRecon
         url = f"https://{target}" if not target.startswith("http") else target
         web_results = WebRecon(url=url).run_full_recon()
@@ -681,9 +735,20 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Web reconnaissance failed: {e}")
 
-    # 7. Header Analysis
+    # 7. API Discovery
     try:
-        section_header("Step 7/9: Header Analysis")
+        section_header("Step 7/10: API & Architecture Discovery")
+        from phantom_recon.core.api_scanner import APIScanner
+        url = f"https://{target}" if not target.startswith("http") else target
+        api_results = APIScanner(url=url).scan_endpoints()
+        all_results["api_endpoints"] = api_results
+        success(f"Discovered {len(api_results)} API endpoints / schemas")
+    except Exception as e:
+        warning(f"API discovery failed: {e}")
+
+    # 8. Header Analysis
+    try:
+        section_header("Step 8/10: Header Analysis")
         from phantom_recon.core.header_analyzer import HeaderAnalyzer
         url = f"https://{target}" if not target.startswith("http") else target
         header_data = HeaderAnalyzer(url=url).analyze()
@@ -692,9 +757,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Header analysis failed: {e}")
 
-    # 8. SSL Analysis
+    # 9. SSL Analysis
     try:
-        section_header("Step 8/9: SSL/TLS Analysis")
+        section_header("Step 9/10: SSL/TLS Analysis")
         from phantom_recon.core.ssl_analyzer import SSLAnalyzer
         ssl_data = SSLAnalyzer(host=target).analyze()
         all_results["ssl"] = ssl_data
@@ -702,9 +767,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"SSL analysis failed: {e}")
 
-    # 9. Vulnerability Scan
+    # 10. Vulnerability Scan
     try:
-        section_header("Step 9/9: Vulnerability Scan")
+        section_header("Step 10/10: Vulnerability Scan")
         from phantom_recon.core.vuln_scanner import VulnerabilityScanner
         url = f"https://{target}" if not target.startswith("http") else target
         vuln_data = VulnerabilityScanner(url=url).scan_all()

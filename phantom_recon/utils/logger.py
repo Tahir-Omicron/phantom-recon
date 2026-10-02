@@ -86,10 +86,147 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.5.2 | Author: Tahir | License: MIT[/dim]\n"
+            "[dim]📌 Version 1.6.0 | Author: Tahir | License: MIT[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing only[/dim yellow]",
             border_style="red",
             padding=(1, 2),
+        )
+    )
+    console.print()
+
+
+def print_command_palette() -> None:
+    """
+    Render an ultra-clean, categorized interactive command palette and cheat sheet.
+    Tailored for cybersecurity students, analysts, and operators for immediate clarity.
+    """
+    console.print(
+        Panel(
+            "[bold cyan]⚡ PHANTOM RECON — COMMAND CENTER & OPERATIONAL PALETTE[/bold cyan]\n"
+            "[dim]A unified ethical hacking framework for surface reconnaissance, vulnerability auditing & edge defense.[/dim]",
+            border_style="cyan",
+            padding=(0, 2),
+        )
+    )
+
+    table = Table(
+        title="Available Commands & Syntax Matrix",
+        title_style="bold white",
+        border_style="bright_blue",
+        show_lines=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Category", style="bold yellow", width=18)
+    table.add_column("Command", style="bold green", width=14)
+    table.add_column("Syntax Example", style="cyan", width=38)
+    table.add_column("Operational Purpose", style="white")
+
+    # Category: Surface Reconnaissance
+    table.add_row(
+        "🌐 Surface Recon",
+        "scan",
+        "phantom scan -t 192.168.1.1 -p 80,443",
+        "Multi-threaded TCP/UDP port scanner with banner grabbing & WAF notice."
+    )
+    table.add_row(
+        "🌐 Surface Recon",
+        "recon",
+        "phantom recon -u https://site.com --full",
+        "Web tech stack fingerprinting, form extraction & directory crawler."
+    )
+    table.add_row(
+        "🌐 Surface Recon",
+        "subdomain",
+        "phantom subdomain -d site.com --ct-logs",
+        "Discover subdomains via Certificate Transparency & DNS brute force."
+    )
+    table.add_row(
+        "🌐 Surface Recon",
+        "dns",
+        "phantom dns -d site.com --type all",
+        "DNS records (A, MX, TXT, NS, SOA), zone transfers & SPF/DMARC spoof check."
+    )
+    table.add_row(
+        "🌐 Surface Recon",
+        "whois",
+        "phantom whois -t site.com",
+        "Domain registration, expiration dates, registrar, and nameservers."
+    )
+
+    # Category: Vulnerability & Defense
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "vuln",
+        "phantom vuln -u https://site.com",
+        "Ultra-precision vulnerability scanner (Zero False Positive) + PoC cURLs."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "waf",
+        "phantom waf -t site.com",
+        "Cloud WAF/CDN detector (10 vendors) & unproxied origin IP leakage audit."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "api",
+        "phantom api -u https://site.com",
+        "API discovery: Swagger/OpenAPI schemas, GraphQL & Spring Actuators."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "ssl",
+        "phantom ssl -h site.com",
+        "SSL/TLS protocol inspector, cipher evaluation & DER binary cert parser."
+    )
+
+    # Category: Network & Access
+    table.add_row(
+        "⚙️ Network & Auth",
+        "network",
+        "phantom network -t 192.168.1.0/24",
+        "Local CIDR subnet live host discovery (ping sweep) & route traceroute."
+    )
+    table.add_row(
+        "⚙️ Network & Auth",
+        "brute",
+        "phantom brute -t host -s ssh -u usr.txt",
+        "Rate-limited credential verification for SSH, FTP, and HTTP Basic."
+    )
+
+    # Category: Master Automation & Reports
+    table.add_row(
+        "📊 Master & Report",
+        "full",
+        "phantom full -t site.com -o report.html",
+        "Master 10-step full reconnaissance pipeline + interactive report."
+    )
+    table.add_row(
+        "📊 Master & Report",
+        "report",
+        "phantom report -i scan.json -f html",
+        "Convert scan JSON into Dark Glassmorphism HTML, CSV, or Markdown."
+    )
+    table.add_row(
+        "📊 Master & Report",
+        "help",
+        "phantom help",
+        "Display this structured interactive command palette and cheat sheet."
+    )
+
+    console.print(table)
+
+    # Quick Start Cheat Sheet Panel
+    console.print(
+        Panel(
+            "[bold white]🚀 Quick-Start Command Cheat Sheet:[/bold white]\n"
+            "  [dim]•[/dim] [cyan]phantom vuln -u https://example.com -o report.html[/cyan]  → [dim]Full web vulnerability assessment + HTML dashboard[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom waf -t example.com[/cyan]                         → [dim]Detect WAF front & audit for leaked origin server IPs[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom api -u https://example.com[/cyan]                         → [dim]Discover OpenAPI/Swagger schemas & GraphQL routes[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                        → [dim]End-to-end 10-stage autonomous penetration test recon[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom scan -t 192.168.1.1 -p top100[/cyan]              → [dim]Scan top 100 ports with banner grabbing[/dim]",
+            title="[bold yellow]💡 Pro Tips[/bold yellow]",
+            border_style="yellow",
+            padding=(0, 2),
         )
     )
     console.print()

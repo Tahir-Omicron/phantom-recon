@@ -1204,6 +1204,61 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_api_and_docs(self) -> list[Vulnerability]:
+        """
+        Audit for publicly exposed API documentation, OpenAPI/Swagger schemas,
+        GraphQL endpoints, and Spring Boot Actuators.
+        """
+        logger.info(f"Auditing target for exposed API schemas & endpoints on '{self.url}'...")
+        vulns = []
+        try:
+            from phantom_recon.core.api_scanner import APIScanner
+            api_scanner = APIScanner(url=self.url, timeout=self.timeout)
+            findings = api_scanner.scan_endpoints()
+
+            for ep in findings:
+                cat = ep.get("category", "")
+                ep_type = ep.get("type", "API Endpoint")
+                ep_url = ep.get("url", "")
+                ep_path = ep.get("path", "")
+                evidence = ep.get("evidence", "")
+
+                if cat == "actuator" and ep_path in ("/actuator/env", "/actuator/httptrace"):
+                    sev = "high"
+                    cvss = 7.5
+                elif cat in ("schema", "actuator"):
+                    sev = "medium"
+                    cvss = 5.3
+                else:
+                    sev = "low"
+                    cvss = 3.7
+
+                vuln = Vulnerability(
+                    title=f"API Exposure: Confirmed {ep_type} at '{ep_path}'",
+                    severity=sev,
+                    cvss_score=cvss,
+                    description=(
+                        f"The web application publicly exposes an active {ep_type}. "
+                        "Publicly accessible API schemas and interfaces expose application routes, "
+                        "data models, parameter requirements, and potential administrative hooks to unauthorized users."
+                    ),
+                    location=f"API Path: {ep_path}",
+                    url=self.url,
+                    poc_url=ep_url,
+                    reproduce_curl=f"curl -i -k '{ep_url}'",
+                    evidence=f"HTTP {ep.get('status_code')} OK\n{evidence}",
+                    remediation=ep.get("remediation", "Restrict endpoint to authorized roles."),
+                    category="api_exposure",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+        except Exception as e:
+            logger.debug(f"API discovery error: {e}")
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -1216,6 +1271,7 @@ class VulnerabilityScanner:
         # Run all precision detection modules
         self.profile_404_baseline()
         self.check_waf_and_origin_leakage()
+        self.check_api_and_docs()
         self.check_security_headers()
         self.check_cookie_security()
         self.check_cors()

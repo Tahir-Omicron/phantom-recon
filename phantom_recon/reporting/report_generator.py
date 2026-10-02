@@ -314,6 +314,18 @@ class ReportGenerator:
                 md_lines.append(f"- `{t}`")
             md_lines.append("")
 
+        # API Endpoints
+        api_eps = self.scan_data.get("api_endpoints", [])
+        if api_eps:
+            md_lines.append("## 🔌 Discovered API Schemas & Documentation")
+            md_lines.append("")
+            md_lines.append("| API Path | Architecture Type | Status | Evidence |")
+            md_lines.append("| :--- | :--- | :---: | :--- |")
+            for ep in api_eps:
+                if isinstance(ep, dict):
+                    md_lines.append(f"| `{ep.get('path')}` | `{ep.get('type')}` | `{ep.get('status_code', 200)}` | {ep.get('evidence', '')[:60]} |")
+            md_lines.append("")
+
         # Security Headers
         headers_data = self.scan_data.get("headers", {})
         if headers_data and isinstance(headers_data, dict):
@@ -450,6 +462,15 @@ class ReportGenerator:
                     lines.append("  Unprotected Origin Candidates:")
                     for c in unprot:
                         lines.append(f"    - IP: {c.get('ip')} | Host: {c.get('hostname')} | Source: {c.get('source')}")
+            lines.append("")
+
+        # API Endpoints
+        if "api_endpoints" in self.scan_data:
+            lines.append("API & ARCHITECTURE DISCOVERY")
+            lines.append("-" * 40)
+            for ep in self.scan_data.get("api_endpoints", []):
+                if isinstance(ep, dict):
+                    lines.append(f"  [{ep.get('status_code', 200)}] {ep.get('path', '')} ({ep.get('type', '')})")
             lines.append("")
 
         # SSL
