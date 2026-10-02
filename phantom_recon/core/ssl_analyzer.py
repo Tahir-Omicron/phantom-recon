@@ -123,11 +123,101 @@ class SSLAnalyzer:
     def _parse_certificate(
         self, cert: Optional[dict], cert_der: Optional[bytes] = None
     ) -> dict[str, Any]:
-        """Parse SSL certificate details."""
+        """Parse SSL certificate details from DER bytes or dict."""
+        info: dict[str, Any] = {}
+
+        # 1. Parse via cryptography.x509 if DER bytes available (handles untrusted/self-signed certs)
+        if cert_der:
+            try:
+                from cryptography import x509
+                from cryptography.hazmat.backends import default_backend
+                from cryptography.x509.oid import NameOID, ExtensionOID
+
+                cert_obj = x509.load_der_x509_certificate(cert_der, default_backend())
+
+                def _get_name_attr(name_obj, oid):
+                    attrs = name_obj.get_attributes_for_oid(oid)
+                    return attrs[0].value if attrs else ""
+
+                info["subject"] = {
+                    "common_name": _get_name_attr(cert_obj.subject, NameOID.COMMON_NAME),
+                    "organization": _get_name_attr(cert_obj.subject, NameOID.ORGANIZATION_NAME),
+                    "organizational_unit": _get_name_attr(cert_obj.subject, NameOID.ORGANIZATIONAL_UNIT_NAME),
+                    "country": _get_name_attr(cert_obj.subject, NameOID.COUNTRY_NAME),
+                    "state": _get_name_attr(cert_obj.subject, NameOID.STATE_OR_PROVINCE_NAME),
+                    "locality": _get_name_attr(cert_obj.subject, NameOID.LOCALITY_NAME),
+                }
+
+                info["issuer"] = {
+                    "common_name": _get_name_attr(cert_obj.issuer, NameOID.COMMON_NAME),
+                    "organization": _get_name_attr(cert_obj.issuer, NameOID.ORGANIZATION_NAME),
+                    "country": _get_name_attr(cert_obj.issuer, NameOID.COUNTRY_NAME),
+                }
+
+                # Validity dates
+                try:
+                    not_before = cert_obj.not_valid_before_utc
+                except AttributeError:
+                    not_before = cert_obj.not_valid_before
+
+                try:
+                    not_after = cert_obj.not_valid_after_utc
+                except AttributeError:
+                    not_after = cert_obj.not_valid_after
+
+                info["not_before"] = not_before.strftime("%b %d %H:%M:%S %Y GMT") if not_before else ""
+                info["not_after"] = not_after.strftime("%b %d %H:%M:%S %Y GMT") if not_after else ""
+
+                if not_after:
+                    now = datetime.now(not_after.tzinfo) if not_after.tzinfo else datetime.now()
+                    days_remaining = (not_after - now).days
+                    info["days_remaining"] = days_remaining
+                    info["expired"] = days_remaining < 0
+
+                    if days_remaining < 0:
+                        logger.error(f"[bold red]✗ Certificate EXPIRED {abs(days_remaining)} days ago![/bold red]")
+                    elif days_remaining < 30:
+                        logger.warning(f"[yellow]⚠ Certificate expires in {days_remaining} days[/yellow]")
+                else:
+                    info["days_remaining"] = None
+                    info["expired"] = None
+
+                # SANs
+                san_list = []
+                try:
+                    ext = cert_obj.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+                    for item in ext.value:
+                        san_list.append({"type": "DNS", "value": str(item.value)})
+                except Exception:
+                    pass
+                info["subject_alt_names"] = san_list
+
+                # Serial number & version
+                info["serial_number"] = hex(cert_obj.serial_number)[2:].upper()
+                info["version"] = f"v{cert_obj.version.value + 1}" if hasattr(cert_obj.version, "value") else str(cert_obj.version)
+
+                # Fingerprints
+                info["fingerprint_sha256"] = hashlib.sha256(cert_der).hexdigest()
+                info["fingerprint_sha1"] = hashlib.sha1(cert_der).hexdigest()
+
+                # Self-signed check
+                info["self_signed"] = bool(
+                    info["subject"].get("common_name")
+                    and info["subject"].get("common_name") == info["issuer"].get("common_name")
+                    and info["subject"].get("organization") == info["issuer"].get("organization")
+                )
+
+                if info["self_signed"]:
+                    logger.warning("[yellow]⚠ Self-signed certificate detected[/yellow]")
+
+                return info
+
+            except Exception as e:
+                logger.debug(f"x509 DER parsing error: {e}")
+
+        # 2. Fallback to standard Python ssl dict if available
         if not cert:
             return {"error": "No certificate data available"}
-
-        info: dict[str, Any] = {}
 
         # Subject
         subject = dict(x[0] for x in cert.get("subject", ()))
@@ -154,8 +244,8 @@ class SSLAnalyzer:
 
         # Check expiry
         try:
-            not_after = ssl.cert_time_to_seconds(cert["notAfter"])
-            days_remaining = (datetime.fromtimestamp(not_after) - datetime.now()).days
+            not_after_sec = ssl.cert_time_to_seconds(cert["notAfter"])
+            days_remaining = (datetime.fromtimestamp(not_after_sec) - datetime.now()).days
             info["days_remaining"] = days_remaining
             info["expired"] = days_remaining < 0
 
@@ -173,10 +263,8 @@ class SSLAnalyzer:
             san_list.append({"type": san_type, "value": san_value})
         info["subject_alt_names"] = san_list
 
-        # Serial number
+        # Serial number & version
         info["serial_number"] = cert.get("serialNumber", "")
-
-        # Version
         info["version"] = cert.get("version", "")
 
         # Fingerprints
@@ -185,8 +273,9 @@ class SSLAnalyzer:
             info["fingerprint_sha1"] = hashlib.sha1(cert_der).hexdigest()
 
         # Self-signed check
-        info["self_signed"] = (
-            info["subject"].get("common_name") == info["issuer"].get("common_name")
+        info["self_signed"] = bool(
+            info["subject"].get("common_name")
+            and info["subject"].get("common_name") == info["issuer"].get("common_name")
             and info["subject"].get("organization") == info["issuer"].get("organization")
         )
 

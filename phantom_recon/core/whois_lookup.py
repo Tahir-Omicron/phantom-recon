@@ -79,11 +79,16 @@ class WhoisLookup:
             if w.expiration_date:
                 exp = w.expiration_date
                 if isinstance(exp, list):
-                    exp = exp[0]
+                    exp = exp[0] if exp else None
                 if isinstance(exp, datetime):
-                    days = (exp - datetime.now()).days
+                    now = datetime.now(exp.tzinfo) if exp.tzinfo is not None else datetime.now()
+                    days = (exp - now).days
                     self._result["days_until_expiry"] = days
-                    if days < 30:
+                    if days < 0:
+                        logger.error(
+                            f"[bold red]✗ Domain EXPIRED {abs(days)} days ago![/bold red]"
+                        )
+                    elif days < 30:
                         logger.warning(
                             f"[yellow]⚠ Domain expires in {days} days![/yellow]"
                         )

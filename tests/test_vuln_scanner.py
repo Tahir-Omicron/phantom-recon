@@ -425,3 +425,178 @@ class TestV140AdvancedAuditing:
         assert "GitHub Pages site here" in res["takeover_evidence"]
 
 
+class TestV150AdvancedFeatures:
+    """Tests for v1.5.0 Email Security, SSL DER parsing, WHOIS timezone safety, and XST."""
+
+    def test_whois_timezone_safety(self):
+        """WHOIS parser must calculate expiry using timezone-aware datetimes without crashing."""
+        from datetime import datetime, timezone, timedelta
+        from phantom_recon.core.whois_lookup import WhoisLookup
+
+        lookup = WhoisLookup(target="acme.org")
+        mock_w = MagicMock()
+        future_date = datetime.now(timezone.utc) + timedelta(days=90)
+        mock_w.domain_name = "acme.org"
+        mock_w.expiration_date = future_date
+        mock_w.registrar = "Safe Registrar"
+        mock_w.whois_server = "whois.nic.org"
+        mock_w.creation_date = None
+        mock_w.updated_date = None
+        mock_w.name_servers = []
+        mock_w.status = []
+        mock_w.emails = []
+        mock_w.dnssec = "unsigned"
+        mock_w.name = "N/A"
+        mock_w.org = "N/A"
+        mock_w.address = "N/A"
+        mock_w.city = "N/A"
+        mock_w.state = "N/A"
+        mock_w.zipcode = "N/A"
+        mock_w.country = "US"
+
+        with patch("whois.whois", return_value=mock_w):
+            res = lookup.lookup()
+
+        assert res.get("days_until_expiry") in (89, 90)
+        assert res.get("registrar") == "Safe Registrar"
+
+    def test_ssl_der_certificate_parsing(self):
+        """SSLAnalyzer must successfully parse DER certificates even when cert_dict is empty."""
+        from datetime import datetime, timezone, timedelta
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from phantom_recon.core.ssl_analyzer import SSLAnalyzer
+
+        # Generate a minimal valid test certificate in DER format
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, "test-secure.internal"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Phantom Labs"),
+        ])
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
+            .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
+            .add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("test-secure.internal")]),
+                critical=False,
+            )
+            .sign(key, hashes.SHA256())
+        )
+        from cryptography.hazmat.primitives.serialization import Encoding
+        der_bytes = cert.public_bytes(Encoding.DER)
+
+        analyzer = SSLAnalyzer(host="test-secure.internal")
+        parsed = analyzer._parse_certificate(cert=None, cert_der=der_bytes)
+
+        assert parsed.get("subject", {}).get("common_name") == "test-secure.internal"
+        assert parsed.get("issuer", {}).get("organization") == "Phantom Labs"
+        assert parsed.get("self_signed") is True
+        assert parsed.get("days_remaining") is not None
+        assert parsed.get("days_remaining") > 300
+        assert any(san.get("value") == "test-secure.internal" for san in parsed.get("subject_alt_names", []))
+
+    def test_dns_email_security_dmarc_and_spf(self):
+        """DNSEnumerator must accurately evaluate SPF and DMARC policies."""
+        from phantom_recon.core.dns_enum import DNSEnumerator
+
+        enumerator = DNSEnumerator(domain="acme-mail.com")
+
+        # Mock SPF returning permissive +all
+        enumerator._query_record = MagicMock(return_value=[
+            {"type": "TXT", "value": "v=spf1 include:_spf.google.com +all"}
+        ])
+
+        with patch("dns.resolver.Resolver.resolve") as mock_resolve:
+            # Mock DMARC returning p=none
+            mock_dmarc_ans = MagicMock()
+            mock_dmarc_ans.__iter__.return_value = ["v=DMARC1; p=none; sp=none; rua=mailto:d@acme.com"]
+            mock_resolve.return_value = mock_dmarc_ans
+
+            audit = enumerator.audit_email_security()
+
+        assert audit["spf"]["present"] is True
+        assert audit["spf"]["policy"] == "+all"
+        assert any("Critical: SPF has '+all'" in iss["issue"] for iss in audit["issues"])
+        assert audit["dmarc"]["present"] is True
+        assert audit["dmarc"]["policy"] == "none"
+        assert any("Weak DMARC policy" in iss["issue"] for iss in audit["issues"])
+
+    @patch("requests.Session.request")
+    def test_http_trace_xst_detection(self, mock_request):
+        """When TRACE returns 200 echoing custom probe header, XST must be confirmed."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "TRACE / HTTP/1.1\r\nX-Phantom-XST-Probe: phantom_trace_test_99\r\n"
+        mock_request.return_value = mock_resp
+
+        scanner = VulnerabilityScanner(url="https://app.vuln-xst.com")
+        vulns = scanner.check_http_trace_xst()
+
+        assert len(vulns) == 1
+        assert "Cross-Site Tracing (XST)" in vulns[0].title
+        assert vulns[0].severity == "medium"
+        assert vulns[0].cve == "CVE-2004-2320"
+        assert vulns[0].confidence == "CONFIRMED"
+
+    @patch("requests.Session.request")
+    def test_http_trace_safe_when_disabled(self, mock_request):
+        """When server rejects TRACE with 405 Method Not Allowed, no vulnerability is flagged."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 405
+        mock_resp.text = "Method Not Allowed"
+        mock_request.return_value = mock_resp
+
+        scanner = VulnerabilityScanner(url="https://secure-app.com")
+        vulns = scanner.check_http_trace_xst()
+        assert len(vulns) == 0
+
+    @patch("phantom_recon.core.web_recon.WebRecon.discover_js_files")
+    @patch("requests.Session.get")
+    def test_javascript_secrets_and_endpoints_detection(self, mock_get, mock_discover_js):
+        """WebRecon must extract API routes and detect exposed Google API keys in JS files."""
+        from phantom_recon.core.web_recon import WebRecon
+
+        mock_discover_js.return_value = ["https://site.com/static/js/main.bundle.js"]
+        mock_js_resp = MagicMock()
+        mock_js_resp.status_code = 200
+        mock_js_resp.text = """
+        const API_URL = "/api/v1/users";
+        const GQL = "/graphql/query";
+        const FIREBASE_KEY = "AIzaSyD-1234567890abcdefghijklmnopqrstuv";
+        """
+        mock_get.return_value = mock_js_resp
+
+        recon = WebRecon(url="https://site.com")
+        analysis = recon.analyze_javascript_files()
+
+        assert "/api/v1/users" in analysis["endpoints"]
+        assert "/graphql/query" in analysis["endpoints"]
+        assert len(analysis["secrets"]) >= 1
+        assert analysis["secrets"][0]["type"] == "Google API Key"
+
+    @patch("requests.Session.get")
+    def test_security_txt_parsing(self, mock_get):
+        """WebRecon must parse RFC 9116 security.txt contact and policy."""
+        from phantom_recon.core.web_recon import WebRecon
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "Contact: mailto:security@acme.org\nPolicy: https://acme.org/security-policy\nExpires: 2027-01-01T00:00:00.000Z"
+        mock_get.return_value = mock_resp
+
+        recon = WebRecon(url="https://acme.org")
+        sec_txt = recon.parse_security_txt()
+
+        assert sec_txt["exists"] is True
+        assert "mailto:security@acme.org" in sec_txt["contact"]
+        assert sec_txt["policy"] == "https://acme.org/security-policy"
+
+
+

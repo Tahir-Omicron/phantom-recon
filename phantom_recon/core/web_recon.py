@@ -417,6 +417,97 @@ class WebRecon:
 
         return js_files
 
+    def analyze_javascript_files(self, max_files: int = 8) -> dict[str, Any]:
+        """
+        Analyze loaded JavaScript files to extract API endpoints and detect exposed secrets.
+
+        Args:
+            max_files: Maximum number of JS files to download and inspect.
+
+        Returns:
+            Dictionary with discovered API endpoints and potential secret leaks.
+        """
+        js_urls = self.discover_js_files()[:max_files]
+        analysis = {
+            "files_analyzed": len(js_urls),
+            "endpoints": [],
+            "secrets": [],
+        }
+
+        endpoint_regex = re.compile(r"""(?:["'])(/(?:api/v[0-9]+|v[0-9]+/|graphql|rest/)[a-zA-Z0-9_\-\./]+)(?:["'])""")
+        secret_patterns = [
+            ("Google API Key", re.compile(r"AIza[0-9A-Za-z\-_]{35}")),
+            ("AWS Access Key ID", re.compile(r"AKIA[0-9A-Z]{16}")),
+            ("Slack Webhook", re.compile(r"https://hooks\.slack\.com/services/T[0-9A-Z]{8,}/B[0-9A-Z]{8,}/[0-9a-zA-Z]{20,}")),
+            ("Private RSA Key", re.compile(r"-----BEGIN (?:RSA )?PRIVATE KEY-----")),
+            ("Hardcoded API Secret", re.compile(r"""(?i)(?:api[_-]?key|access[_-]?token|auth[_-]?secret)\s*[:=]\s*["']([a-zA-Z0-9_\-]{24,})["']""")),
+        ]
+
+        for js_url in js_urls:
+            try:
+                resp = self.session.get(js_url, timeout=min(self.timeout, 5.0))
+                if resp.status_code != 200:
+                    continue
+
+                text = resp.text[:500000]  # Cap at 500KB per file for fast performance
+
+                # Extract endpoints
+                for match in endpoint_regex.findall(text):
+                    if match not in analysis["endpoints"]:
+                        analysis["endpoints"].append(match)
+
+                # Extract secrets
+                for secret_type, pat in secret_patterns:
+                    matches = pat.findall(text)
+                    for m in matches:
+                        secret_val = m if isinstance(m, str) else m[0]
+                        # Redact secret value for safe storage/reporting
+                        redacted = secret_val[:6] + "..." + secret_val[-4:] if len(secret_val) > 10 else "***"
+                        analysis["secrets"].append({
+                            "type": secret_type,
+                            "file": js_url,
+                            "preview": redacted,
+                        })
+
+            except requests.RequestException:
+                continue
+
+        return analysis
+
+    def parse_security_txt(self) -> dict[str, Any]:
+        """
+        Check and parse RFC 9116 security.txt file.
+
+        Returns:
+            Dictionary with security.txt presence and extracted directives.
+        """
+        result = {"exists": False, "url": "", "contact": [], "expires": "", "encryption": "", "policy": ""}
+        candidates = [f"{self.url}/.well-known/security.txt", f"{self.url}/security.txt"]
+
+        for cand in candidates:
+            try:
+                resp = self.session.get(cand, timeout=self.timeout, allow_redirects=True)
+                if resp.status_code == 200 and "contact:" in resp.text.lower():
+                    result["exists"] = True
+                    result["url"] = cand
+                    for line in resp.text.splitlines():
+                        line = line.strip()
+                        if line.lower().startswith("contact:"):
+                            val = line.split(":", 1)[1].strip()
+                            if val and val not in result["contact"]:
+                                result["contact"].append(val)
+                        elif line.lower().startswith("expires:"):
+                            result["expires"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("encryption:"):
+                            result["encryption"] = line.split(":", 1)[1].strip()
+                        elif line.lower().startswith("policy:"):
+                            result["policy"] = line.split(":", 1)[1].strip()
+                    break
+            except requests.RequestException:
+                continue
+
+        return result
+
     def run_full_recon(self) -> dict[str, Any]:
         """
         Run full web reconnaissance.
@@ -453,6 +544,9 @@ class WebRecon:
         # Sitemap
         results["sitemap_urls"] = self.parse_sitemap()
 
+        # Security.txt
+        results["security_txt"] = self.parse_security_txt()
+
         # Forms
         results["forms"] = self.detect_forms()
 
@@ -464,6 +558,9 @@ class WebRecon:
 
         # JavaScript files
         results["js_files"] = self.discover_js_files()
+
+        # JavaScript deep analysis
+        results["js_analysis"] = self.analyze_javascript_files()
 
         # Directory enumeration
         results["directories"] = self.enumerate_directories()

@@ -926,6 +926,203 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_http_trace_xst(self) -> list[Vulnerability]:
+        """
+        Audit for Cross-Site Tracing (XST) via enabled HTTP TRACE method.
+        Eliminates false positives by asserting status 200 and reflection of a custom probe header.
+        """
+        logger.info("Auditing HTTP TRACE method for Cross-Site Tracing (XST)...")
+        vulns = []
+        probe_header = "X-Phantom-XST-Probe"
+        probe_val = "phantom_trace_test_99"
+
+        try:
+            resp = self.session.request(
+                "TRACE",
+                self.url,
+                headers={probe_header: probe_val},
+                timeout=self.timeout,
+                allow_redirects=False,
+            )
+
+            # Strict verification: must return 200 OK and echo the probe header in the body
+            if resp.status_code == 200 and probe_val in resp.text:
+                vuln = Vulnerability(
+                    title="Cross-Site Tracing (XST): HTTP TRACE Method Enabled",
+                    severity="medium",
+                    cvss_score=5.3,
+                    cve="CVE-2004-2320",
+                    description=(
+                        "The web server has the HTTP TRACE method enabled and echoes request headers back in the response body. "
+                        "When combined with a Cross-Site Scripting (XSS) vulnerability, attackers can steal HttpOnly cookies and authorization headers."
+                    ),
+                    location="HTTP Request Method: TRACE",
+                    url=self.url,
+                    poc_url=self.url,
+                    reproduce_curl=f"curl -i -k -X TRACE -H '{probe_header}: {probe_val}' '{self.url}'",
+                    evidence=f"HTTP 200 OK received for TRACE request.\nEchoed Header Probe: {probe_header}: {probe_val}",
+                    remediation="Disable HTTP TRACE on the web server (Apache: 'TraceEnable Off'; Nginx: return 405 for TRACE requests).",
+                    category="misconfiguration",
+                    confidence="CONFIRMED",
+                    method="TRACE",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+        except requests.RequestException:
+            pass
+
+        return vulns
+
+    def check_email_security(self) -> list[Vulnerability]:
+        """
+        DNS Email Security and Anti-Spoofing Audit (SPF & DMARC).
+        Identifies missing or insecure policies that allow domain-level email phishing and spoofing.
+        """
+        parsed = urlparse(self.url)
+        domain = parsed.hostname or ""
+        # Skip IP addresses or localhost
+        if not domain or re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", domain) or domain in ("localhost", "127.0.0.1"):
+            return []
+
+        logger.info(f"Auditing DNS email spoofing defenses for domain '{domain}'...")
+        vulns = []
+        try:
+            from phantom_recon.core.dns_enum import DNSEnumerator
+            dns_auditor = DNSEnumerator(domain=domain, timeout=self.timeout)
+            audit = dns_auditor.audit_email_security()
+
+            # 1. DMARC Checks
+            dmarc = audit.get("dmarc", {})
+            if not dmarc.get("present"):
+                vuln = Vulnerability(
+                    title=f"Email Spoofing Risk: Missing DMARC Record on '{domain}'",
+                    severity="high",
+                    cvss_score=7.1,
+                    description=(
+                        f"The domain '{domain}' lacks a DMARC (Domain-based Message Authentication, Reporting, and Conformance) DNS record. "
+                        "Without DMARC, receiving email servers cannot verify authentic senders, allowing attackers to forge emails from this domain."
+                    ),
+                    location=f"DNS TXT Record: '_dmarc.{domain}'",
+                    url=self.url,
+                    poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a{domain}",
+                    reproduce_curl=f"nslookup -type=TXT _dmarc.{domain}",
+                    evidence=f"No DMARC TXT record detected at _dmarc.{domain}.",
+                    remediation=f"Publish a DMARC TXT record at '_dmarc.{domain}' (e.g. 'v=DMARC1; p=reject; rua=mailto:dmarc-reports@{domain}').",
+                    category="dns_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+            elif dmarc.get("policy") == "none":
+                vuln = Vulnerability(
+                    title=f"Email Spoofing Exposure: Ineffective DMARC Policy (p=none) on '{domain}'",
+                    severity="medium",
+                    cvss_score=5.3,
+                    description=(
+                        f"The DMARC policy for '{domain}' is set to 'p=none' (monitoring only). "
+                        "Spoofed emails originating from unauthorized third parties will still be delivered to recipient inboxes without rejection or quarantine."
+                    ),
+                    location=f"DNS TXT Record: '_dmarc.{domain}'",
+                    url=self.url,
+                    poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a{domain}",
+                    reproduce_curl=f"nslookup -type=TXT _dmarc.{domain}",
+                    evidence=f"Current DMARC Record: {dmarc.get('raw', '')}\nPolicy: p=none",
+                    remediation=f"Enforce anti-spoofing by upgrading the DMARC policy from 'p=none' to 'p=quarantine' or 'p=reject'.",
+                    category="dns_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+            # 2. SPF Checks
+            spf = audit.get("spf", {})
+            if not spf.get("present"):
+                vuln = Vulnerability(
+                    title=f"Email Security: Missing SPF Record on '{domain}'",
+                    severity="medium",
+                    cvss_score=5.3,
+                    description=(
+                        f"The domain '{domain}' does not publish a Sender Policy Framework (SPF) record. "
+                        "Mail servers cannot determine authorized IP addresses permitted to send email on behalf of this domain."
+                    ),
+                    location=f"DNS TXT Record: '{domain}'",
+                    url=self.url,
+                    poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=spf%3a{domain}",
+                    reproduce_curl=f"nslookup -type=TXT {domain}",
+                    evidence=f"No SPF record starting with 'v=spf1' found on {domain}.",
+                    remediation="Add a valid SPF TXT record defining authorized sending servers (e.g. 'v=spf1 mx -all').",
+                    category="dns_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+            elif spf.get("policy") == "+all":
+                vuln = Vulnerability(
+                    title=f"Critical Email Spoofing: Permissive SPF Record (+all) on '{domain}'",
+                    severity="critical",
+                    cvss_score=9.1,
+                    description=(
+                        f"The SPF record on '{domain}' explicitly specifies '+all', authorizing every server on the internet to send legitimate emails from this domain."
+                    ),
+                    location=f"DNS TXT Record: '{domain}'",
+                    url=self.url,
+                    poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=spf%3a{domain}",
+                    reproduce_curl=f"nslookup -type=TXT {domain}",
+                    evidence=f"Insecure SPF Record: {spf.get('raw', '')}",
+                    remediation="Update SPF policy from '+all' to '-all' (hard fail) or '~all' (soft fail).",
+                    category="dns_security",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+        except Exception as e:
+            logger.debug(f"Email security audit error for {domain}: {e}")
+
+        return vulns
+
+    def check_javascript_secrets(self) -> list[Vulnerability]:
+        """
+        Audit client-side JavaScript files for exposed credentials and private API keys.
+        """
+        logger.info("Analyzing client-side JavaScript files for hardcoded secrets...")
+        vulns = []
+        try:
+            from phantom_recon.core.web_recon import WebRecon
+            recon = WebRecon(url=self.url, timeout=self.timeout, follow_redirects=self.follow_redirects)
+            js_results = recon.analyze_javascript_files(max_files=6)
+
+            for secret in js_results.get("secrets", []):
+                sec_type = secret.get("type", "API Secret")
+                sec_file = secret.get("file", self.url)
+                preview = secret.get("preview", "***")
+
+                vuln = Vulnerability(
+                    title=f"Information Disclosure: Exposed {sec_type} in JavaScript",
+                    severity="high" if any(w in sec_type for w in ["Key", "Token", "Secret"]) else "medium",
+                    cvss_score=7.5 if any(w in sec_type for w in ["Key", "Token", "Secret"]) else 5.3,
+                    description=(
+                        f"A client-side JavaScript file exposes sensitive credentials ({sec_type}). "
+                        "Publicly accessible secrets can be harvested by malicious actors to access private cloud services or APIs."
+                    ),
+                    location=f"JavaScript Asset: {sec_file}",
+                    url=self.url,
+                    poc_url=sec_file,
+                    reproduce_curl=f"curl -i -k '{sec_file}'",
+                    evidence=f"Identified credential signature: {sec_type}\nRedacted Token: {preview}",
+                    remediation="Remove sensitive credentials from client-side bundles. Use backend proxy endpoints or secrets management.",
+                    category="sensitive_data",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+        except Exception as e:
+            logger.debug(f"JavaScript secret scanning error: {e}")
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -945,6 +1142,9 @@ class VulnerabilityScanner:
         self.check_directory_listing()
         self.check_parameter_reflection()
         self.check_open_redirect()
+        self.check_http_trace_xst()
+        self.check_email_security()
+        self.check_javascript_secrets()
         self.check_information_disclosure()
         self.check_ssl_issues()
 

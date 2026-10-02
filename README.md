@@ -5,20 +5,20 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.4.0)</strong>
+  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.5.0)</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
   <a href="#modules"><img src="https://img.shields.io/badge/modules-10+-red.svg?style=for-the-badge" alt="10+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-60%20passed-brightgreen.svg?style=for-the-badge" alt="60 Tests Passing"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-67%20passed-brightgreen.svg?style=for-the-badge" alt="67 Tests Passing"/></a>
   <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v140">What's New in v1.4.0</a> •
+  <a href="#whats-new-in-v150">What's New in v1.5.0</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
   <a href="#modules">Modules & CLI</a> •
@@ -29,24 +29,25 @@
 
 ---
 
-## 🚀 What's New in v1.4.0
+## 🚀 What's New in v1.5.0
 
-- 🍪 **Defensive Cookie Security Auditing**:
-  - Full automated audit for `Set-Cookie` directives validating `Secure`, `HttpOnly`, and `SameSite` (Lax/Strict) attributes on all session and application identifiers.
-- 🚨 **Subdomain Takeover Risk Detection**:
-  - Automatically identifies dangling DNS CNAME records and unconfigured third-party buckets across GitHub Pages, AWS S3, Heroku, Microsoft Azure, Shopify, and Zendesk.
-- 🌐 **Advanced CORS `Origin: null` Whitelist Audit**:
-  - Pinpoints servers that unsafely trust `Origin: null` headers, exposing authenticated users to sandboxed iframe attacks.
-- 📊 **Multi-Format Enterprise Reporting**:
-  - **CSV Export (`--format csv`)**: UTF-8 BOM encoding for seamless Microsoft Excel, Jira, and DefectDojo vulnerability triage.
-  - **Markdown Export (`--format md`)**: GitHub-flavored formatted tables and PoC blocks for Bug Bounty submissions (HackerOne, Bugcrowd).
-  - **In-Browser Export**: Direct `Export CSV` and `Export JSON` buttons directly inside the live HTML glassmorphism dashboard.
-- 📂 **Zero-False-Positive Directory Listing & Backup Scanner**:
-  - Validates genuine web server indexing signatures (Apache, Nginx, IIS) and exposed SQL database dumps (`/backup.sql`).
-- 🔄 **Unified 8-Step Master Pipeline**:
-  - End-to-end execution linking WHOIS, DNS, Subdomains, Ports, Web Recon, Headers, SSL, and Vulnerability scanning with one CLI command.
-- 🧪 **100% Green Test Suite**:
-  - 60 automated unit tests verifying error-handling, edge-case resilience, and zero false positives.
+- 📧 **DNS Email Spoofing Defense (SPF & DMARC Audit)**:
+  - Automated analysis of domain SPF policies (`+all` permissive critical flaw, `?all` neutral, `~all` softfail, `-all` strict).
+  - DMARC policy inspection (`_dmarc.<domain>`) alerting on missing records and ineffective `p=none` policies that allow email forgery and BEC attacks.
+- 🔐 **High-Fidelity DER Certificate Parsing (`cryptography.x509`)**:
+  - Direct binary DER parsing resolving Python's standard `ssl.CERT_NONE` empty certificate dictionary limitation.
+  - Extracts Subject, Issuer, Validity Period, Days Remaining, SANs, and Self-Signed indicators even on untrusted, expired, or private certificates.
+- 🌐 **Cross-Site Tracing (XST / HTTP TRACE Method) Audit**:
+  - Sends verifiable probe headers over HTTP `TRACE` to detect header reflection allowing `HttpOnly` cookie exfiltration (CVE-2004-2320).
+- ⚡ **JavaScript Secrets & Hidden API Route Extractor**:
+  - Automatically crawls and inspects client-side JavaScript bundles to extract hidden API endpoints (`/api/v1/...`, `/graphql`, `/rest/...`).
+  - Scans for leaked developer tokens, including Google API keys (`AIza...`), AWS Access Keys (`AKIA...`), Slack Webhooks, and private RSA keys.
+- 📋 **RFC 9116 `security.txt` Vulnerability Disclosure Parser**:
+  - Scans `/.well-known/security.txt` and `/security.txt` to parse official bug bounty disclosure channels and contact points.
+- ⏰ **Offset-Aware Timezone WHOIS Resilience**:
+  - Eliminates naive/aware timezone subtraction crashes when processing domain expiration dates from major registrars.
+- 🧪 **Expanded 67-Test Verification Suite**:
+  - 67 passed automated unit tests validating 100% precision across all auditing and recon modules.
 
 ---
 
@@ -359,13 +360,13 @@ pytest tests/ -v
 ```
 ============================= test session starts =============================
 platform win32 -- Python 3.12.10, pytest-9.1.1
-collected 60 items
+collected 67 items
 
-tests/test_scanner.py .............                                      [ 21%]
-tests/test_validators.py ..............................                  [ 71%]
-tests/test_vuln_scanner.py .................                              [100%]
+tests/test_scanner.py .............                                      [ 19%]
+tests/test_validators.py ..............................                  [ 64%]
+tests/test_vuln_scanner.py ........................                      [100%]
 
-============================= 60 passed in 0.47s ==============================
+============================= 67 passed in 1.73s ==============================
 ```
 
 ---
@@ -381,7 +382,7 @@ phantom-recon/
 ├── 📄 SECURITY.md                  # Responsible disclosure policy
 │
 ├── 🔥 phantom_recon/               # Core framework package
-│   ├── __init__.py                 # Version & package exports (v1.4.0)
+│   ├── __init__.py                 # Version & package exports (v1.5.0)
 │   ├── cli.py                      # Click CLI entry point
 │   │
 │   ├── 🧠 core/                    # Specialized scanning engines
