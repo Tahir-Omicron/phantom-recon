@@ -86,7 +86,7 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.5.0 | Author: Tahir | License: MIT[/dim]\n"
+            "[dim]📌 Version 1.5.1 | Author: Tahir | License: MIT[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing only[/dim yellow]",
             border_style="red",
             padding=(1, 2),

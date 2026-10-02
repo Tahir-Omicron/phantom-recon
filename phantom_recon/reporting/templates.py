@@ -672,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.5.0 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.5.1 (Zero False Positive)</strong></span>
                 </div>
             </div>
 

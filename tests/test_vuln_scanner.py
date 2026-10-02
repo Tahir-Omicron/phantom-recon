@@ -599,4 +599,55 @@ class TestV150AdvancedFeatures:
         assert sec_txt["policy"] == "https://acme.org/security-policy"
 
 
+class TestV151LaboratoryValidation:
+    """Rigorous laboratory validation ensuring zero false positives in edge cases."""
+
+    def test_subdomain_dmarc_inheritance_prevents_false_positive(self):
+        """When subdomain lacks direct DMARC, it must inherit parent policy with sp=reject."""
+        from phantom_recon.core.dns_enum import DNSEnumerator
+
+        sub_enum = DNSEnumerator(domain="api.staging.acme-corp.com")
+        sub_enum._query_record = MagicMock(return_value=[
+            {"type": "TXT", "value": "v=spf1 include:_spf.acme-corp.com -all"}
+        ])
+
+        with patch("dns.resolver.Resolver.resolve") as mock_resolve:
+            def mock_dns_resolve(qname, rtype):
+                if "_dmarc.api.staging.acme-corp.com" in str(qname):
+                    raise Exception("NXDOMAIN")
+                elif "_dmarc.acme-corp.com" in str(qname):
+                    ans = MagicMock()
+                    ans.__iter__.return_value = ["v=DMARC1; p=reject; sp=reject; rua=mailto:dmarc@acme-corp.com"]
+                    return ans
+                raise Exception("NXDOMAIN")
+
+            mock_resolve.side_effect = mock_dns_resolve
+            audit = sub_enum.audit_email_security()
+
+        # DMARC must be inherited and confirmed as reject
+        assert audit["dmarc"]["present"] is True
+        assert audit["dmarc"]["policy"] == "reject"
+        assert "inherited from acme-corp.com" in audit["dmarc"]["raw"]
+        # No missing or weak DMARC issue should be raised!
+        assert not any("Missing DMARC" in iss["issue"] for iss in audit["issues"])
+        assert not any("Weak DMARC" in iss["issue"] for iss in audit["issues"])
+
+    @patch("requests.Session.request")
+    def test_http_trace_soft_404_prevents_false_positive(self, mock_request):
+        """A generic soft-404 error page reflecting headers must NOT trigger false positive XST."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "<html><body><h1>Error Page Not Found</h1>Headers: X-Phantom-XST-Probe: phantom_trace_test_99</body></html>"
+        mock_request.return_value = mock_resp
+
+        scanner = VulnerabilityScanner(url="https://catchall.example.com")
+        # Simulate soft-404 detection
+        scanner._is_soft_404 = MagicMock(return_value=True)
+
+        vulns = scanner.check_http_trace_xst()
+        # Must NOT be flagged as XST!
+        assert len(vulns) == 0
+
+
+
 

@@ -945,8 +945,8 @@ class VulnerabilityScanner:
                 allow_redirects=False,
             )
 
-            # Strict verification: must return 200 OK and echo the probe header in the body
-            if resp.status_code == 200 and probe_val in resp.text:
+            # Strict verification: must return 200 OK, echo probe header, and not be a soft-404 page
+            if resp.status_code == 200 and probe_val in resp.text and not self._is_soft_404(resp):
                 vuln = Vulnerability(
                     title="Cross-Site Tracing (XST): HTTP TRACE Method Enabled",
                     severity="medium",

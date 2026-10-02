@@ -127,12 +127,26 @@ def recon(ctx, url, full, tech, dirs):
             results["directories"] = web.enumerate_directories()
 
     # Display results
-    if "technologies" in results:
-        info(f"Technologies detected: {', '.join(results['technologies']) or 'None'}")
+    if "technologies" in results and results["technologies"]:
+        info(f"Technologies detected: {', '.join(results['technologies'])}")
 
-    if "directories" in results:
+    if "directories" in results and results["directories"]:
         for d in results["directories"]:
             success(f"[{d['status_code']}] {d['path']}")
+
+    if "js_analysis" in results:
+        endpoints = results["js_analysis"].get("endpoints", [])
+        secrets = results["js_analysis"].get("secrets", [])
+        if endpoints:
+            info(f"Discovered JS API Endpoints ({len(endpoints)}): {', '.join(endpoints[:5])}" + ("..." if len(endpoints) > 5 else ""))
+        if secrets:
+            console.print("\n[bold red]🚨 EXPOSED CLIENT-SIDE JAVASCRIPT SECRETS FOUND:[/bold red]")
+            for s in secrets:
+                console.print(f"  • [yellow]{s.get('type')}[/yellow] in [cyan]{s.get('file')}[/cyan] (Token: {s.get('preview')})")
+
+    if "security_txt" in results and results["security_txt"].get("exists"):
+        sec = results["security_txt"]
+        success(f"RFC 9116 security.txt discovered at {sec.get('url')} (Contacts: {', '.join(sec.get('contact', []))})")
 
     _save_output(ctx, results)
 
@@ -142,9 +156,10 @@ def recon(ctx, url, full, tech, dirs):
 @click.option("--domain", "-d", required=True, help="Target domain.")
 @click.option("--type", "record_type", default="all", help="Record types (all, a, mx, ns, txt, etc.).")
 @click.option("--zone-transfer", is_flag=True, help="Attempt zone transfer.")
+@click.option("--email", "email_audit", is_flag=True, help="Include SPF/DMARC email security audit.")
 @click.pass_context
-def dns(ctx, domain, record_type, zone_transfer):
-    """📡 DNS record enumeration."""
+def dns(ctx, domain, record_type, zone_transfer, email_audit):
+    """📡 DNS record enumeration and anti-spoofing defense audit."""
     print_banner()
     section_header("DNS Enumeration")
 
@@ -154,6 +169,7 @@ def dns(ctx, domain, record_type, zone_transfer):
 
     if record_type.lower() == "all":
         results = enumerator.enumerate_all()
+        results["email_security"] = enumerator.audit_email_security()
     else:
         types = [t.strip().upper() for t in record_type.split(",")]
         results = {"domain": domain, "records": {}}
@@ -161,6 +177,8 @@ def dns(ctx, domain, record_type, zone_transfer):
             records = enumerator.enumerate_type(t)
             if records:
                 results["records"][t] = records
+        if email_audit:
+            results["email_security"] = enumerator.audit_email_security()
 
     if zone_transfer:
         zt_results = enumerator.check_zone_transfer()
@@ -170,6 +188,20 @@ def dns(ctx, domain, record_type, zone_transfer):
     for rtype, records in results.get("records", {}).items():
         for r in records:
             info(f"{rtype}: {r.get('value', '')}")
+
+    if "email_security" in results:
+        email_sec = results["email_security"]
+        spf = email_sec.get("spf", {})
+        dmarc = email_sec.get("dmarc", {})
+        console.print("\n[bold cyan]📧 Email Anti-Spoofing & Domain Protection:[/bold cyan]")
+        spf_status = "[bold green]✓ Configured[/bold green]" if spf.get("present") else "[bold red]✗ Missing[/bold red]"
+        console.print(f"  • SPF Record:    {spf_status} ({spf.get('policy', 'None')})")
+        if dmarc.get("present"):
+            d_pol = dmarc.get("policy", "none")
+            d_color = "bold green" if d_pol in ("reject", "quarantine") else "bold yellow"
+            console.print(f"  • DMARC Policy:  [{d_color}]✓ {d_pol.upper()}[/{d_color}] ({dmarc.get('raw', '')[:60]})")
+        else:
+            console.print("  • DMARC Policy:  [bold red]✗ Missing (High Spoofing Risk)[/bold red]")
 
     _save_output(ctx, results)
 

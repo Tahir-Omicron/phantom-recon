@@ -346,6 +346,41 @@ class DNSEnumerator:
         except Exception:
             pass
 
+        # Subdomain DMARC inheritance fallback (RFC 7489)
+        # If subdomain lacks direct DMARC record, check parent organizational domain
+        if not results["dmarc"]["present"]:
+            parts = self.domain.split(".")
+            if len(parts) > 2:
+                org_domain = ".".join(parts[-2:])
+                try:
+                    import dns.resolver
+                    resolver = dns.resolver.Resolver()
+                    if self.nameserver:
+                        resolver.nameservers = [self.nameserver]
+                    resolver.timeout = self.timeout
+                    resolver.lifetime = self.timeout
+
+                    org_dmarc = f"_dmarc.{org_domain}"
+                    answers = resolver.resolve(org_dmarc, "TXT")
+                    for ans in answers:
+                        val = str(ans).strip("\"'")
+                        if "v=DMARC1" in val:
+                            sp_match = re.search(r"sp\s*=\s*([a-zA-Z]+)", val)
+                            p_match = re.search(r"p\s*=\s*([a-zA-Z]+)", val)
+                            # Subdomain policy sp takes precedence; otherwise falls back to p
+                            policy = sp_match.group(1).lower() if sp_match else (p_match.group(1).lower() if p_match else "none")
+                            results["dmarc"]["present"] = True
+                            results["dmarc"]["raw"] = f"{val} (inherited from {org_domain})"
+                            results["dmarc"]["policy"] = policy
+
+                            if policy == "none":
+                                issue = f"Inherited DMARC policy from {org_domain} is 'p/sp=none' (monitoring only)."
+                                results["dmarc"]["issues"].append(issue)
+                                results["issues"].append({"severity": "medium", "issue": issue})
+                            break
+                except Exception:
+                    pass
+
         if not results["dmarc"]["present"]:
             issue = "Missing DMARC record — domain lacks DMARC protection against email spoofing."
             results["dmarc"]["issues"].append(issue)
