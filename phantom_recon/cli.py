@@ -14,6 +14,10 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import urllib3
+
+# Suppress unverified HTTPS request warnings for clean CLI output
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from phantom_recon.utils.logger import (
     print_banner,
