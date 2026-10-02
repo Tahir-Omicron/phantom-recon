@@ -199,6 +199,39 @@ SENSITIVE_FILES_DATABASE = [
         "description": "macOS .DS_Store file reveals private file system hierarchy, hidden file names, and directories.",
         "remediation": "Configure web server to deny access to .DS_Store files and add to .gitignore.",
     },
+    {
+        "path": "/docker-compose.yml",
+        "title": "Exposed Docker Compose Configuration (docker-compose.yml)",
+        "severity": "high",
+        "cvss": 7.5,
+        "category": "sensitive_data",
+        "regex": r"(?m)^(version:\s*['\"]?[23]|services:\s*\n\s+\w+:)",
+        "must_not_contain": ["<!DOCTYPE html", "<html", "<head", "<body"],
+        "description": "Publicly accessible Docker Compose manifest discloses internal container architecture, linked services, ports, and environment variable names.",
+        "remediation": "Remove container orchestration files from public document roots.",
+    },
+    {
+        "path": "/terraform.tfstate",
+        "title": "Exposed Terraform Infrastructure State File (terraform.tfstate)",
+        "severity": "critical",
+        "cvss": 9.8,
+        "category": "sensitive_data",
+        "regex": r"(?m)(\"format_version\":|\"terraform_version\":|\"resources\":\s*\[)",
+        "must_not_contain": ["<!DOCTYPE html", "<html", "<head", "<body"],
+        "description": "Publicly readable Terraform state file disclosing cloud infrastructure architecture, private IP subnets, and plaintext resource credentials.",
+        "remediation": "Never store terraform.tfstate in web document roots. Use secure encrypted remote state backends.",
+    },
+    {
+        "path": "/Dockerfile",
+        "title": "Exposed Docker Container Build Specification (Dockerfile)",
+        "severity": "medium",
+        "cvss": 5.3,
+        "category": "info_disclosure",
+        "regex": r"(?m)^(FROM\s+[a-zA-Z0-9_\.\/-]+|RUN\s+|ENTRYPOINT\s+|WORKDIR\s+)",
+        "must_not_contain": ["<!DOCTYPE html", "<html", "<head", "<body"],
+        "description": "Exposed Dockerfile reveals base image versions, internal system packages, and build execution steps.",
+        "remediation": "Exclude Dockerfiles from the public web server directory.",
+    },
 ]
 
 
@@ -1347,6 +1380,45 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_cms_and_frameworks(self) -> list[Vulnerability]:
+        """
+        Audit CMS, web frameworks, and client-side source map exposures.
+        """
+        logger.info("Auditing CMS, web frameworks, and source map disclosures...")
+        vulns = []
+        try:
+            from phantom_recon.core.cms_auditor import CMSAuditor
+            auditor = CMSAuditor(
+                url=self.url,
+                timeout=self.timeout,
+                verify_ssl=self.verify_ssl,
+            )
+            cms_results = auditor.run_full_audit()
+            for v_data in cms_results.get("vulnerabilities", []):
+                # Avoid duplicate findings
+                if any(existing.title == v_data.get("title") for existing in self._vulns):
+                    continue
+                v = Vulnerability(
+                    title=v_data["title"],
+                    severity=v_data["severity"],
+                    cvss_score=v_data.get("cvss_score", 5.0),
+                    description=v_data["description"],
+                    location=v_data.get("location", "CMS / Framework Architecture"),
+                    url=self.url,
+                    poc_url=v_data.get("poc_url", self.url),
+                    reproduce_curl=v_data.get("reproduce_curl", f"curl -i -k '{self.url}'"),
+                    evidence=v_data.get("evidence", ""),
+                    remediation=v_data.get("remediation", ""),
+                    category="cms_framework",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(v)
+                self._add_vuln(v)
+        except Exception as e:
+            logger.debug(f"CMS audit error: {e}")
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -1361,6 +1433,7 @@ class VulnerabilityScanner:
         self.check_waf_and_origin_leakage()
         self.check_api_and_docs()
         self.check_cloud_storage()
+        self.check_cms_and_frameworks()
         self.check_http_methods()
         self.check_security_headers()
         self.check_cookie_security()

@@ -1,5 +1,5 @@
 """
-Phantom Recon — Ultra-Modern Enterprise Security Dashboard (v1.2.0).
+Phantom Recon — Ultra-Modern Enterprise Security Dashboard (v1.9.0).
 
 State-of-the-art dark glassmorphism cybersecurity report template featuring
 real-time interactive search, severity filtering, SVG security health gauge,
@@ -974,6 +974,50 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     {% endfor %}
                 </tbody>
             </table>
+        </section>
+        {% endif %}
+
+        <!-- CMS & Framework Architecture Audit Section -->
+        {% if data.get('cms') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>🧩 CMS & Framework Architecture Audit</span>
+                <span class="badge" style="background: rgba(0, 229, 255, 0.15); border: 1px solid var(--neon-cyan); color: var(--neon-cyan);">
+                    {{ data.get('cms', {}).get('detected_cms', [])|join(', ') or 'Generic / Custom' }}
+                </span>
+            </div>
+            <p style="color: var(--text-sub); font-size: 0.9em; margin-bottom: 16px;">
+                <strong>Identified Platforms:</strong> {{ data.get('cms', {}).get('detected_cms', [])|join(', ') or 'No standard CMS signatures detected' }}
+                | <strong>Primary:</strong> <code>{{ data.get('cms', {}).get('primary_cms', 'Generic / Custom') }}</code>
+            </p>
+            {% if data.get('cms', {}).get('findings') %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>Finding / Exposure</th>
+                        <th>Severity</th>
+                        <th>Location</th>
+                        <th>Evidence / Proof</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in data.get('cms', {}).get('findings', []) %}
+                    <tr>
+                        <td><code style="color: var(--neon-cyan); font-weight: 700;">{{ f.get('cms_name') }}</code></td>
+                        <td><strong>{{ f.get('title') }}</strong></td>
+                        <td><span class="badge badge-{{ f.get('severity', 'info')|lower }}">{{ f.get('severity') }}</span></td>
+                        <td><a href="{{ f.get('url') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan); font-size: 0.9em;">{{ f.get('location') }}</a></td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ f.get('evidence', '')[:80] }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: var(--neon-green); font-size: 0.9em; margin-top: 8px;">
+                ✓ No exposed CMS debug logs, user enumeration endpoints, or source map leaks detected.
+            </p>
+            {% endif %}
         </section>
         {% endif %}
 

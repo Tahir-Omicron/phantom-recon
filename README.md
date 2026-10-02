@@ -5,20 +5,20 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.8.0)</strong>
+  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.9.0)</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
-  <a href="#modules"><img src="https://img.shields.io/badge/modules-14+-red.svg?style=for-the-badge" alt="14+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-125%20passed-brightgreen.svg?style=for-the-badge" alt="125 Tests Passing"/></a>
+  <a href="#modules"><img src="https://img.shields.io/badge/modules-15+-red.svg?style=for-the-badge" alt="15+ Modules"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-143%20passed-brightgreen.svg?style=for-the-badge" alt="143 Tests Passing"/></a>
   <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v180">What's New in v1.8.0</a> •
+  <a href="#whats-new-in-v190">What's New in v1.9.0</a> •
   <a href="#release-history">Release History</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
@@ -30,35 +30,40 @@
 
 ---
 
-## 🚀 What's New in v1.8.0
+## 🚀 What's New in v1.9.0
 
-- 🚫 **HTTP Methods & Dangerous Verbs Auditor (`phantom methods`)**:
-  - Full discovery and auditing of supported HTTP verbs via `OPTIONS` (`Allow` & `Public` headers).
-  - High-precision canary probes with zero false positives:
-    - **HTTP PUT**: Validates unauthenticated file upload / creation vulnerabilities with immediate benign cleanup.
-    - **HTTP DELETE**: Audits whether unauthenticated resource deletion endpoints are exposed.
-    - **HTTP TRACE**: Cross-Site Tracing (XST) probe ensuring exact echo reflection of unique canary tokens.
-    - **WebDAV PROPFIND**: Detects active WebDAV extensions that disclose internal directory and document structures.
-  - HTTP Method Override audit (`X-HTTP-Method-Override: PUT`, `X-Method-Override`).
-- 🛡️ **Executive Security Posture Score & Terminal Scorecard (`print_security_score_gauge`)**:
-  - Standardized 0-100 Security Health Score and Letter Grade (`A+`, `A`, `B`, `C`, `D`, `F`) calculated with severity & CVSS weights.
-  - Ultra-clean terminal scorecard rendered upon scan completion (`phantom vuln`, `phantom methods`, `phantom full`), featuring progress health bars across Web App, Cloud, Cryptography/SSL, DNS, and Network perimeter.
-  - Synchronized across HTML dashboard, Markdown report, and Plain Text report.
-- 🎯 **12-Stage Master Autonomous Reconnaissance Pipeline (`phantom full`)**:
-  - Extended master pipeline to 12 automated phases, with HTTP Methods & Dangerous Verbs Audit as Step 11/12, followed by Vulnerability Matrix as Step 12/12 and the Security Scorecard.
-- 🎨 **Minimalist Red Team Terminal Banner & Sleek Visual Branding**:
-  - Redesigned, ultra-sharp horizontal ASCII banner in crimson red & neon green that fits on standard 80-column terminals with zero line wrapping or unicode block font distortion.
-  - New minimalist cyber red-team banner asset in `assets/banner.png` with pixel typography and glowing demon shield.
-- 🧪 **Expanded Automated Test Suite (125 Passing Tests)**:
-  - 18 new automated tests for HTTP methods, WebDAV, method override, security score algorithm, and report generation.
+- 🧩 **CMS & Framework Security Auditor (`phantom cms`)**:
+  - Full automated architecture fingerprinting for **WordPress, Laravel, Django, Next.js, Drupal, Joomla, and Spring Boot**.
+  - **WordPress Security Audit**:
+    - User enumeration via REST API (`/wp-json/wp/v2/users`) extracting valid usernames and IDs for credential brute-force defense.
+    - Public XML-RPC interface detection (`/xmlrpc.php`) mitigating multi-call brute force and DDoS amplification.
+    - Public debug log leakage (`/wp-content/debug.log`) uncovering internal PHP stack traces and server variables.
+    - Exact version disclosure detection via `/readme.html`.
+  - **Laravel Framework Security Audit**:
+    - Unprotected application logs (`/storage/logs/laravel.log`) disclosing internal database errors and stack traces.
+    - Exposed Laravel Telescope debug assistant (`/telescope`) exposing HTTP requests, session tokens, and queries.
+  - **Admin Interface Discovery**: Identifies public access to Django Admin (`/admin/login/`), Drupal (`/user/login`), and Joomla (`/administrator/`).
+- 📜 **Frontend JavaScript Source Map Discovery (`.js.map`)**:
+  - Automatically identifies script tags, constructs and verifies `.js.map` file pairs with JSON schema validation (`version`, `sources`).
+  - Detects client-side source code disclosures allowing reverse engineering of proprietary frontend logic, TypeScript source files, and internal endpoints.
+- 🐳 **DevOps & Cloud Infrastructure Manifest Auditing**:
+  - Precision discovery of `/docker-compose.yml`, `/terraform.tfstate`, and `/Dockerfile`.
+  - Zero false positives: Protected with regex syntax matching and HTML soft-404 anti-reflection canary filters.
+- 🎯 **13-Stage Master Autonomous Reconnaissance Pipeline (`phantom full`)**:
+  - Integrates CMS & Framework Security Audit as Stage 9/13, executing end-to-end OSINT, infrastructure recon, and web application auditing.
+- 📊 **Synchronized Multi-Format Reports**:
+  - Dedicated CMS & Framework Architecture Audit section added across interactive HTML dashboard, GitHub-flavored Markdown, Plain Text, and CSV export.
+- 🧪 **Expanded Automated Test Suite (143 Passing Tests)**:
+  - 18 new automated tests for CMS auditing, source map detection, DevOps manifests, and report generation.
   - 100% test pass rate in under 4 seconds.
 
 ---
 
-## 📜 Release History & Changelog (v1.0.0 — v1.8.0)
+## 📜 Release History & Changelog (v1.0.0 — v1.9.0)
 
 | Version | Release Focus | Key Additions & Fixes |
 | :--- | :--- | :--- |
+| **v1.9.0** | **CMS & Framework Auditor, DevOps Manifests & JavaScript Source Maps** | • CMS & Framework Security Auditor (`phantom cms`) supporting WordPress, Laravel, Django, Next.js, Drupal, Joomla, and Spring Boot.<br>• WordPress REST API user enumeration, XML-RPC exposure, and debug log detection.<br>• Laravel log disclosure and exposed Telescope dashboard.<br>• Frontend JavaScript Source Map (`.js.map`) leakage discovery.<br>• DevOps infrastructure checks: `/docker-compose.yml`, `/terraform.tfstate`, `/Dockerfile`.<br>• Master pipeline expanded to 13 automated stages (`phantom full`).<br>• Expanded test suite to **143 passing tests**. |
 | **v1.8.0** | **HTTP Methods Auditor, Security Score & Sleek Red Team Banner** | • HTTP Methods & Dangerous Verbs Auditor (`phantom methods`) for PUT, DELETE, TRACE, and WebDAV.<br>• Executive Security Health Score (0-100, A+ to F) with terminal gauge and category breakdown.<br>• Master pipeline expanded to 12 automated stages (`phantom full`).<br>• Streamlined, zero-wrap horizontal terminal ASCII banner and sleek pixel cyber banner asset.<br>• Expanded test suite to **125 passing tests**. |
 | **v1.7.0** | **Multi-Cloud Auditor & Finding Matrix** | • Multi-Cloud Storage Auditor across AWS S3, GCP Storage, and Azure Blob (`phantom cloud`).<br>• Executive & Technical Vulnerability Matrix Table with exact descriptions, real-world impact, and remediation across HTML, Markdown, Text, and Terminal.<br>• Extended master pipeline (`phantom full`) to 11 automated stages.<br>• Interactive HTML filter synchronizes both the table matrix and card views.<br>• Expanded test suite to **107 passing tests**. |
 | **v1.6.0** | **API Recon, Deep CSP & Rich CLI UX** | • Embedded repository banner asset (`assets/banner.png`).<br>• Interactive Command Palette & categorized matrix (`phantom help`).<br>• API reconnaissance engine discovering OpenAPI/Swagger, GraphQL & Actuator endpoints (`phantom api`).<br>• Deep Content-Security-Policy (CSP) evaluator (`'unsafe-inline'`, `'unsafe-eval'`).<br>• Upgraded master pipeline (`phantom full`) to 10 automated steps.<br>• Expanded test suite to **93 passing tests**. |
@@ -88,6 +93,9 @@
 | 🖼️ **Repository Visual Branding** | High-definition repository banner and crisp identity asset (`assets/banner.png`). |
 | ☁️ **Multi-Cloud Storage Auditor** | Audits AWS S3, Google Cloud Storage, and Azure Blob containers for public listing (`phantom cloud`). |
 | 🛡️ **Vulnerability Findings Matrix** | Structured technical finding table with impact descriptions and remediations across all report formats. |
+| 🧩 **CMS & Framework Auditor** | Fingerprints WordPress, Laravel, Next.js, Django, and detects exposed debug logs, XML-RPC, and user accounts (`phantom cms`). |
+| 📜 **Source Map & DevOps Audit** | Discovers exposed JavaScript `.js.map` source files, `docker-compose.yml`, and `terraform.tfstate`. |
+| 🚫 **HTTP Methods & Verbs Auditor** | Identifies risky verbs (`PUT`, `DELETE`, `TRACE/XST`, `WebDAV`) and method overrides (`phantom methods`). |
 | 💻 **Rich Command Palette & Matrix** | Interactive categorized operational table and cheat sheet (`phantom help`) built for cybersecurity pros and students. |
 | ⚡ **API & Schema Reconnaissance** | Discovers OpenAPI/Swagger JSON schemas, Swagger UI/ReDoc portals, GraphQL endpoints, and Spring Boot Actuators. |
 | 🛡️ **Zero False Positive Engine** | Soft-404 canary profiling, semantic regex matching, and dual-origin CORS reflection verification. |
@@ -122,13 +130,19 @@ pip install -e ".[dev]"
 # View the interactive command palette & cheat sheet
 phantom help
 
+# Audit CMS, frameworks, and exposed JavaScript source maps
+phantom cms --url https://example.com
+
 # Audit AWS S3, GCP Storage, and Azure Blob containers for public exposure
 phantom cloud --target example.com
+
+# Audit HTTP verbs and dangerous methods (PUT, DELETE, TRACE, WebDAV)
+phantom methods --url https://example.com
 
 # Run a vulnerability audit with interactive HTML report
 phantom vuln --url https://example.com --output audit_report.html
 
-# Run the complete 11-stage full reconnaissance pipeline
+# Run the complete 13-stage full reconnaissance pipeline
 phantom full --target example.com --output full_report.html
 ```
 
@@ -291,7 +305,7 @@ phantom cloud --target example.com --output cloud_report.html
 - 🟦 **Google Cloud Storage (GCS)**: Audits `https://storage.googleapis.com/<bucket>`. Evaluates XML and JSON listing endpoints, extracts sample object keys, and verifies Public Access Prevention posture.
 - 🔷 **Microsoft Azure Blob Storage**: Audits `https://<account>.blob.core.windows.net/<container>?restype=container&comp=list`. Checks `$root`, `public`, `backup`, `data`, and `media` containers.
 
-### 5. ⚡ API & Schema Reconnaissance (`phantom api`)
+### 6. ⚡ API & Schema Reconnaissance (`phantom api`)
 
 Discovers exposed API schemas, interactive documentation portals, GraphQL endpoints, and Spring Boot Actuators.
 
@@ -310,7 +324,31 @@ phantom api --url https://api.example.com --timeout 15 --output api_findings.jso
 - ⚙️ **Spring Boot Actuators**: `/actuator/health`, `/actuator/env`, `/actuator/metrics`, `/actuator/beans`
 - 🛡️ **Canary Soft-404 Validation**: Automatically profiles random endpoints (`/__phantom_canary_probe__`) to filter out false positives on Single Page Applications (SPAs).
 
-### 6. 🌐 Web Reconnaissance (`phantom recon`)
+### 7. 🧩 CMS & Framework Security Auditor (`phantom cms`)
+
+Fingerprints modern web application frameworks and Content Management Systems, identifying debug logs, public user enumeration endpoints, administrative portals, and client-side source map disclosures.
+
+```bash
+# Audit target application for CMS vulnerabilities and source maps
+phantom cms --url https://example.com
+
+# Audit with custom network timeout
+phantom cms --url https://example.com --timeout 10
+
+# Audit and export findings to interactive HTML dashboard
+phantom cms --url https://example.com --output cms_report.html
+```
+
+**Audited Technologies & Exposures:**
+- 🌐 **Architecture Fingerprinting**: WordPress, Laravel, Django, Next.js, Drupal, Joomla, and Spring Boot.
+- 👤 **WordPress REST API User Enumeration**: Queries `/wp-json/wp/v2/users` to harvest valid usernames and user IDs for credential brute-force defense.
+- ⚡ **WordPress XML-RPC Exposure**: Verifies `/xmlrpc.php` access for amplified brute force and DDoS pingback vectors.
+- 🪵 **Application Debug Logs**: Detects publicly accessible `/wp-content/debug.log` and Laravel `/storage/logs/laravel.log`.
+- 🔭 **Laravel Telescope Dashboard**: Probes `/telescope` for unauthenticated monitoring access exposing sensitive request bodies and SQL queries.
+- 🗺️ **Frontend JavaScript Source Maps (`.js.map`)**: Inspects script tags, locates production `.js.map` files, and verifies JSON schemas to uncover client-side source code, developer notes, and hidden internal API endpoints.
+- 🔑 **Exposed Admin Portals**: Identifies accessible Django Admin (`/admin/login/`), Drupal (`/user/login`), and Joomla (`/administrator/`).
+
+### 8. 🌐 Web Reconnaissance (`phantom recon`)
 
 Web application fingerprinting and surface mapping.
 
@@ -325,7 +363,7 @@ phantom recon --url https://example.com --tech
 phantom recon --url https://example.com --dirs
 ```
 
-### 7. 🔎 Subdomain Discovery (`phantom subdomain`)
+### 9. 🔎 Subdomain Discovery (`phantom subdomain`)
 
 Find subdomains and detect takeover risks.
 
@@ -340,7 +378,7 @@ phantom subdomain --domain example.com --ct-logs
 phantom subdomain --domain example.com --wordlist wordlists/subdomains.txt --threads 50
 ```
 
-### 8. 📡 DNS Enumeration (`phantom dns`)
+### 10. 📡 DNS Enumeration (`phantom dns`)
 
 Enumerate DNS records, SPF/DMARC anti-spoofing policies, and test for zone transfers.
 
@@ -355,7 +393,7 @@ phantom dns --domain example.com --type a,mx,ns,txt
 phantom dns --domain example.com --zone-transfer
 ```
 
-### 9. 🔐 SSL/TLS Cryptographic Analysis (`phantom ssl`)
+### 11. 🔐 SSL/TLS Cryptographic Analysis (`phantom ssl`)
 
 Inspect SSL/TLS certificate chains, protocols, and ciphers.
 
@@ -367,7 +405,7 @@ phantom ssl --host example.com
 phantom ssl --host example.com --port 8443
 ```
 
-### 10. 🔑 Multi-Protocol Brute Force (`phantom brute`)
+### 12. 🔑 Multi-Protocol Brute Force (`phantom brute`)
 
 Rate-limited authentication auditing.
 
@@ -382,7 +420,7 @@ phantom brute --target ftp.example.com --service ftp --userlist users.txt --pass
 phantom brute --target https://example.com/admin --service http --userlist users.txt --passlist passwords.txt
 ```
 
-### 11. 🗺️ Network Mapper (`phantom network`)
+### 13. 🗺️ Network Mapper (`phantom network`)
 
 Local network host discovery and traceroute.
 
@@ -394,7 +432,7 @@ phantom network --target 192.168.1.0/24 --discover
 phantom network --target 8.8.8.8 --traceroute
 ```
 
-### 12. 📋 WHOIS Intelligence (`phantom whois`)
+### 14. 📋 WHOIS Intelligence (`phantom whois`)
 
 Registrar, creation, expiration, and nameserver lookup.
 
@@ -402,7 +440,7 @@ Registrar, creation, expiration, and nameserver lookup.
 phantom whois --target example.com
 ```
 
-### 13. 💻 Interactive Rich Command Palette (`phantom help`)
+### 15. 💻 Interactive Rich Command Palette (`phantom help`)
 
 Renders a categorized command matrix and operational cheat sheet designed for fast triage:
 
@@ -411,7 +449,7 @@ Renders a categorized command matrix and operational cheat sheet designed for fa
 phantom help
 ```
 
-### 14. 📊 Multi-Format Report Generator (`phantom report`)
+### 16. 📊 Multi-Format Report Generator (`phantom report`)
 
 Convert scan data into professional reports.
 
@@ -429,15 +467,15 @@ phantom report --input scan.json --format md --output report.md
 phantom report --input scan.json --format txt --output report.txt
 ```
 
-### 15. 🎯 Master Recon Pipeline (`phantom full`)
+### 17. 🎯 Master Recon Pipeline (`phantom full`)
 
-Execute all 11 specialized reconnaissance and audit phases in sequence:
+Execute all 13 specialized reconnaissance and audit phases in sequence:
 
 ```bash
 phantom full --target example.com --output phantom_report.html
 ```
 
-**Pipeline Steps (11 Automated Stages):**
+**Pipeline Steps (13 Automated Stages):**
 1. WHOIS Intelligence & Domain Attribution
 2. DNS Enumeration & Anti-Spoofing Policy Audit
 3. Subdomain Discovery & Takeover Inspection
@@ -446,9 +484,11 @@ phantom full --target example.com --output phantom_report.html
 6. Port Scanning & Service Identification
 7. Web Application Reconnaissance (Tech stack, directories, forms)
 8. API Schema & Documentation Reconnaissance (OpenAPI, GraphQL, Actuators)
-9. Security Header & Deep CSP Directive Analysis
-10. SSL/TLS Cryptographic Analysis
-11. Ultra-Precision Vulnerability Scan & Finding Explanation Matrix
+9. CMS & Framework Security Audit (WordPress, Laravel, Django, .js.map source maps)
+10. Security Header & Deep CSP Directive Analysis
+11. SSL/TLS Cryptographic Analysis
+12. HTTP Methods & Dangerous Verbs Audit (PUT, DELETE, TRACE, WebDAV)
+13. Ultra-Precision Vulnerability Scan, Finding Explanation Matrix & Security Scorecard
 
 ---
 

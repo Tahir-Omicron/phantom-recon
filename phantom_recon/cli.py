@@ -555,6 +555,54 @@ def methods(ctx, url, timeout):
     _save_output(ctx, results)
 
 
+# ─── CMS & Framework Security Auditor ───────────────────────────
+@main.command("cms")
+@click.option("--url", "-u", required=True, help="Target application URL.")
+@click.option("--timeout", default=6.0, help="Request timeout (seconds).")
+@click.pass_context
+def cms_cmd(ctx, url, timeout):
+    """🧩 CMS & Framework security auditor (WordPress, Laravel, Django, .js.map)."""
+    print_banner()
+    section_header("CMS & Framework Security Audit")
+
+    from phantom_recon.core.cms_auditor import CMSAuditor
+    from phantom_recon.reporting.security_score import calculate_security_score
+
+    info(f"Auditing CMS & Framework architecture on: [bold cyan]{url}[/bold cyan]")
+    auditor = CMSAuditor(url=url, timeout=timeout)
+    results = auditor.run_full_audit()
+
+    detected = results.get("detected_cms", [])
+    primary = results.get("primary_cms", "Generic / Custom")
+    if detected:
+        success(f"Detected Platform: [bold green]{', '.join(detected)}[/bold green] (Primary: {primary})")
+    else:
+        info("No standard CMS signatures detected (custom web application).")
+
+    findings = results.get("findings", [])
+    if findings:
+        rows = []
+        for f in findings:
+            rows.append([
+                f.get("title", ""),
+                f.get("cms_name", ""),
+                severity_badge(f.get("severity", "info")),
+                f.get("evidence", "")[:70],
+            ])
+        print_results_table(
+            f"CMS & Framework Security Findings — {url}",
+            [("Vulnerability / Finding", "bold"), ("Platform", "cyan"), ("Severity", ""), ("Evidence / Details", "dim")],
+            rows,
+        )
+
+        score_data = calculate_security_score(findings)
+        print_security_score_gauge(score_data)
+    else:
+        success("No exposed CMS debug logs, user enumeration endpoints, or source map leaks detected.")
+
+    _save_output(ctx, results)
+
+
 # ─── Brute Force ─────────────────────────────────────────────────
 @main.command()
 @click.option("--target", "-t", required=True, help="Target host.")
@@ -782,7 +830,7 @@ def full(ctx, target, output):
 
     # 1. WHOIS
     try:
-        section_header("Step 1/12: WHOIS Lookup")
+        section_header("Step 1/13: WHOIS Lookup")
         from phantom_recon.core.whois_lookup import WhoisLookup
         whois_data = WhoisLookup(target=target).lookup()
         all_results["whois"] = whois_data
@@ -792,7 +840,7 @@ def full(ctx, target, output):
 
     # 2. DNS
     try:
-        section_header("Step 2/12: DNS Enumeration")
+        section_header("Step 2/13: DNS Enumeration")
         from phantom_recon.core.dns_enum import DNSEnumerator
         dns_data = DNSEnumerator(domain=target).enumerate_all()
         all_results["dns"] = dns_data
@@ -802,7 +850,7 @@ def full(ctx, target, output):
 
     # 3. Subdomain Discovery
     try:
-        section_header("Step 3/12: Subdomain Discovery")
+        section_header("Step 3/13: Subdomain Discovery")
         from phantom_recon.core.subdomain import SubdomainFinder
         subs = SubdomainFinder(domain=target, threads=20).find_all()
         all_results["subdomains"] = subs
@@ -812,7 +860,7 @@ def full(ctx, target, output):
 
     # 4. WAF & Origin IP Audit
     try:
-        section_header("Step 4/12: WAF & Origin IP Leakage Audit")
+        section_header("Step 4/13: WAF & Origin IP Leakage Audit")
         from phantom_recon.core.waf_detector import WAFDetector
         waf_data = WAFDetector(target=target).run_full_waf_analysis()
         all_results["waf"] = waf_data
@@ -827,7 +875,7 @@ def full(ctx, target, output):
 
     # 5. Cloud Storage Audit
     try:
-        section_header("Step 5/12: Cloud Storage & Bucket Leakage Audit")
+        section_header("Step 5/13: Cloud Storage & Bucket Leakage Audit")
         from phantom_recon.core.cloud_auditor import CloudAuditor
         cloud_results = CloudAuditor(target=target, threads=20).run_cloud_audit()
         all_results["cloud_storage"] = cloud_results
@@ -842,7 +890,7 @@ def full(ctx, target, output):
 
     # 6. Port Scan
     try:
-        section_header("Step 6/12: Port Scanning")
+        section_header("Step 6/13: Port Scanning")
         from phantom_recon.core.scanner import PortScanner
         scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
         all_results["ports"] = scan_results.get("ports", {})
@@ -852,7 +900,7 @@ def full(ctx, target, output):
 
     # 7. Web Reconnaissance
     try:
-        section_header("Step 7/12: Web Application Reconnaissance")
+        section_header("Step 7/13: Web Application Reconnaissance")
         from phantom_recon.core.web_recon import WebRecon
         url = f"https://{target}" if not target.startswith("http") else target
         web_results = WebRecon(url=url).run_full_recon()
@@ -865,7 +913,7 @@ def full(ctx, target, output):
 
     # 8. API Discovery
     try:
-        section_header("Step 8/12: API & Architecture Discovery")
+        section_header("Step 8/13: API & Architecture Discovery")
         from phantom_recon.core.api_scanner import APIScanner
         url = f"https://{target}" if not target.startswith("http") else target
         api_results = APIScanner(url=url).scan_endpoints()
@@ -874,9 +922,27 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"API discovery failed: {e}")
 
-    # 9. Header Analysis
+    # 9. CMS & Framework Security Audit
     try:
-        section_header("Step 9/12: Header Analysis")
+        section_header("Step 9/13: CMS & Framework Security Audit")
+        from phantom_recon.core.cms_auditor import CMSAuditor
+        url = f"https://{target}" if not target.startswith("http") else target
+        cms_results = CMSAuditor(url=url).run_full_audit()
+        all_results["cms"] = cms_results
+        detected_cms = cms_results.get("detected_cms", [])
+        if detected_cms:
+            info(f"Identified Frameworks/CMS: [bold green]{', '.join(detected_cms)}[/bold green]")
+        cms_findings = cms_results.get("findings", [])
+        if cms_findings:
+            warning(f"Discovered {len(cms_findings)} CMS / framework security exposures!")
+        else:
+            success("CMS audit clean: No debug logs or sensitive exposures discovered.")
+    except Exception as e:
+        warning(f"CMS security audit failed: {e}")
+
+    # 10. Header Analysis
+    try:
+        section_header("Step 10/13: Header Analysis")
         from phantom_recon.core.header_analyzer import HeaderAnalyzer
         url = f"https://{target}" if not target.startswith("http") else target
         header_data = HeaderAnalyzer(url=url).analyze()
@@ -885,9 +951,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Header analysis failed: {e}")
 
-    # 10. SSL Analysis
+    # 11. SSL Analysis
     try:
-        section_header("Step 10/12: SSL/TLS Analysis")
+        section_header("Step 11/13: SSL/TLS Analysis")
         from phantom_recon.core.ssl_analyzer import SSLAnalyzer
         ssl_data = SSLAnalyzer(host=target).analyze()
         all_results["ssl"] = ssl_data
@@ -895,9 +961,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"SSL analysis failed: {e}")
 
-    # 11. HTTP Methods & Dangerous Verbs Audit
+    # 12. HTTP Methods & Dangerous Verbs Audit
     try:
-        section_header("Step 11/12: HTTP Methods & Dangerous Verbs Audit")
+        section_header("Step 12/13: HTTP Methods & Dangerous Verbs Audit")
         from phantom_recon.core.http_methods import HTTPMethodsAuditor
         url = f"https://{target}" if not target.startswith("http") else target
         methods_data = HTTPMethodsAuditor(url=url).audit_all()
@@ -913,9 +979,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"HTTP methods audit failed: {e}")
 
-    # 12. Vulnerability Scan
+    # 13. Vulnerability Scan
     try:
-        section_header("Step 12/12: Vulnerability Scan & Matrix Analysis")
+        section_header("Step 13/13: Vulnerability Scan & Matrix Analysis")
         from phantom_recon.core.vuln_scanner import VulnerabilityScanner
         url = f"https://{target}" if not target.startswith("http") else target
         scanner = VulnerabilityScanner(url=url)

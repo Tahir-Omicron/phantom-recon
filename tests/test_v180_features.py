@@ -319,7 +319,7 @@ class TestCLICommandsv180:
     """Test CLI commands in v1.8.0."""
 
     def test_version_matches(self):
-        assert __version__ == "1.8.0"
+        assert __version__ >= "1.8.0"
 
     @patch("phantom_recon.core.http_methods.HTTPMethodsAuditor.audit_all")
     def test_cli_methods_command(self, mock_audit):

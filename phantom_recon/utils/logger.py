@@ -82,7 +82,7 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.8.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
+            "[dim]📌 Version 1.9.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing & defensive posture assessment only[/dim yellow]",
             border_style="red",
             box=box.ROUNDED,
@@ -177,6 +177,12 @@ def print_command_palette() -> None:
     )
     table.add_row(
         "🛡️ Vuln & Defense",
+        "cms",
+        "phantom cms -u https://site.com",
+        "CMS & framework auditor (WordPress, Laravel, Django, .js.map source maps)."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
         "methods",
         "phantom methods -u https://site.com",
         "HTTP methods auditor (OPTIONS, PUT, DELETE, TRACE/XST, WebDAV & Overrides)."
@@ -207,7 +213,7 @@ def print_command_palette() -> None:
         "📊 Master & Report",
         "full",
         "phantom full -t site.com -o report.html",
-        "Master 12-step full autonomous recon & vulnerability pipeline + HTML report."
+        "Master 13-step full autonomous recon & vulnerability pipeline + HTML report."
     )
     table.add_row(
         "📊 Master & Report",
@@ -229,12 +235,13 @@ def print_command_palette() -> None:
         Panel(
             "[bold white]🚀 Quick-Start Command Cheat Sheet:[/bold white]\n"
             "  [dim]•[/dim] [cyan]phantom vuln -u https://example.com -o report.html[/cyan]  → [dim]Full web vulnerability assessment + HTML dashboard[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom methods -u https://example.com[/cyan]              → [dim]Audit dangerous HTTP verbs (PUT, DELETE, TRACE, WebDAV)[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom cloud -t example.com[/cyan]                        → [dim]Audit AWS S3, GCP & Azure for publicly exposed buckets[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom waf -t example.com[/cyan]                         → [dim]Detect WAF front & audit for leaked origin server IPs[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom api -u https://example.com[/cyan]                         → [dim]Discover OpenAPI/Swagger schemas & GraphQL routes[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                        → [dim]End-to-end 12-stage autonomous penetration test recon[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom scan -t 192.168.1.1 -p top100[/cyan]              → [dim]Scan top 100 ports with banner grabbing[/dim]",
+            "  [dim]•[/dim] [cyan]phantom cms -u https://example.com[/cyan]                   → [dim]Audit WordPress, Laravel, Django & .js.map source code leaks[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom methods -u https://example.com[/cyan]               → [dim]Audit dangerous HTTP verbs (PUT, DELETE, TRACE, WebDAV)[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom cloud -t example.com[/cyan]                         → [dim]Audit AWS S3, GCP & Azure for publicly exposed buckets[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom waf -t example.com[/cyan]                           → [dim]Detect WAF front & audit for leaked origin server IPs[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom api -u https://example.com[/cyan]                           → [dim]Discover OpenAPI/Swagger schemas & GraphQL routes[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                          → [dim]End-to-end 13-stage autonomous penetration test recon[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom scan -t 192.168.1.1 -p top100[/cyan]                → [dim]Scan top 100 ports with banner grabbing[/dim]",
             title="[bold yellow]💡 Pro Tips[/bold yellow]",
             border_style="yellow",
             padding=(0, 2),

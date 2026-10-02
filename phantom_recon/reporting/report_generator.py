@@ -370,6 +370,28 @@ class ReportGenerator:
                     hdr = chk.get("header", "")
                     val = chk.get("value", "") or "*missing*"
                     rec = chk.get("recommendation", "")
+        # CMS & Framework Security Audit
+        if "cms" in self.scan_data:
+            cms_data = self.scan_data["cms"]
+            if isinstance(cms_data, dict):
+                md_lines.append("## 🧩 CMS & Framework Architecture Audit")
+                md_lines.append("")
+                detected = cms_data.get("detected_cms", [])
+                primary = cms_data.get("primary_cms", "Generic / Custom")
+                md_lines.append(f"- **Detected Platforms:** `{', '.join(detected) if detected else 'None (Custom / Generic)'}`")
+                md_lines.append(f"- **Primary Architecture:** `{primary}`")
+                md_lines.append("")
+                cms_findings = cms_data.get("findings", [])
+                if cms_findings:
+                    md_lines.append("| Platform | Finding | Severity | Location | Evidence |")
+                    md_lines.append("| :--- | :--- | :---: | :--- | :--- |")
+                    for f in cms_findings:
+                        if isinstance(f, dict):
+                            sev = f.get("severity", "INFO").upper()
+                            loc_link = f"[{f.get('location')}]({f.get('url')})" if f.get("url") else f.get("location")
+                            md_lines.append(f"| `{f.get('cms_name')}` | **{f.get('title')}** | `{sev}` | {loc_link} | {f.get('evidence', '')[:60]} |")
+                    md_lines.append("")
+
         # HTTP Methods & Dangerous Verbs
         if "http_methods" in self.scan_data:
             hm = self.scan_data["http_methods"]
@@ -552,6 +574,22 @@ class ReportGenerator:
                     if isinstance(f, dict):
                         st = "OPEN [!]" if f.get("is_open") else "PROTECTED"
                         lines.append(f"    - [{f.get('provider')}] {f.get('bucket_name')}: {st} -> {f.get('url')}")
+            lines.append("")
+
+        # CMS & Framework Findings
+        if "cms" in self.scan_data:
+            lines.append("CMS & FRAMEWORK ARCHITECTURE AUDIT")
+            lines.append("-" * 40)
+            cms_data = self.scan_data["cms"]
+            if isinstance(cms_data, dict):
+                detected = cms_data.get("detected_cms", [])
+                lines.append(f"  Detected Platforms:  {', '.join(detected) if detected else 'None (Generic / Custom)'}")
+                lines.append(f"  Primary CMS:         {cms_data.get('primary_cms', 'Generic')}")
+                findings = cms_data.get("findings", [])
+                lines.append(f"  Security Findings:   {len(findings)}")
+                for f in findings:
+                    if isinstance(f, dict):
+                        lines.append(f"    - [{f.get('cms_name')}] {f.get('title')} ({f.get('severity', 'info').upper()}) -> {f.get('url')}")
             lines.append("")
 
         # SSL
