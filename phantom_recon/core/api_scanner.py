@@ -8,6 +8,7 @@ Engineered with zero-false-positive baseline validation.
 ⚠️ DISCLAIMER: For authorized security testing only.
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 import json
@@ -129,116 +130,128 @@ class APIScanner:
                 return True
         return False
 
+    def _test_candidate(self, candidate: dict[str, Any]) -> Optional[APIEndpointFinding]:
+        target_url = urljoin(self.url + "/", candidate["path"].lstrip("/"))
+        try:
+            resp = self.session.get(target_url, timeout=self.timeout, allow_redirects=True)
+            
+            # Filter out standard 404/403/500 errors and soft-404s
+            if resp.status_code not in (200, 204, 301, 302, 400):
+                return None
+            if self._is_soft_404(resp):
+                return None
+
+            content_type = resp.headers.get("Content-Type", "").lower()
+            body_text = resp.text[:15000].lower()
+            cat = candidate["category"]
+
+            # 1. OpenAPI / Swagger Schema Validation
+            if cat == "schema" and resp.status_code == 200:
+                try:
+                    data = json.loads(resp.text)
+                    if isinstance(data, dict) and any(k in data for k in ["swagger", "openapi", "paths", "components"]):
+                        return APIEndpointFinding(
+                            url=target_url,
+                            path=candidate["path"],
+                            endpoint_type=candidate["type"],
+                            category=cat,
+                            status_code=resp.status_code,
+                            content_type=content_type,
+                            evidence=f"Valid JSON schema with keys: {[k for k in data.keys() if k in ['swagger', 'openapi', 'paths', 'info']]}",
+                            remediation="Restrict public schema access; require API gateway authentication or disable schema exposure in production.",
+                        )
+                except Exception:
+                    pass
+
+            # 2. Interactive Documentation Validation
+            elif cat == "docs" and resp.status_code == 200:
+                if any(sig in body_text for sig in ["swagger-ui", "swagger ui", "redoc", "api documentation", "openapi"]):
+                    return APIEndpointFinding(
+                        url=target_url,
+                        path=candidate["path"],
+                        endpoint_type=candidate["type"],
+                        category=cat,
+                        status_code=resp.status_code,
+                        content_type=content_type,
+                        evidence=f"Interactive documentation UI confirmed (Found '{candidate['type']}').",
+                        remediation="Ensure interactive API consoles are protected behind internal network firewalls or OAuth2 login.",
+                    )
+
+            # 3. GraphQL Endpoint Validation
+            elif cat == "graphql":
+                # Send non-destructive probe to confirm live GraphQL schema
+                is_graphql = False
+                evidence_str = ""
+                try:
+                    gql_resp = self.session.post(
+                        target_url,
+                        json={"query": "{__typename}"},
+                        timeout=self.timeout,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    if gql_resp.status_code in (200, 400):
+                        gql_data = gql_resp.json()
+                        if "data" in gql_data or "errors" in gql_data:
+                            is_graphql = True
+                            evidence_str = f"GraphQL query response confirmed: {json.dumps(gql_data)[:100]}"
+                except Exception:
+                    if "graphiql" in body_text or "graphql" in body_text:
+                        is_graphql = True
+                        evidence_str = "Interactive GraphiQL interface detected in HTML body."
+
+                if is_graphql:
+                    return APIEndpointFinding(
+                        url=target_url,
+                        path=candidate["path"],
+                        endpoint_type=candidate["type"],
+                        category=cat,
+                        status_code=resp.status_code,
+                        content_type=content_type,
+                        evidence=evidence_str,
+                        remediation="Disable GraphQL introspection in production and apply rate-limiting/query depth restrictions.",
+                    )
+
+            # 4. Spring Boot Actuator Validation
+            elif cat == "actuator" and resp.status_code == 200:
+                try:
+                    act_data = json.loads(resp.text)
+                    if isinstance(act_data, dict) and any(k in act_data for k in ["_links", "status", "components", "propertySources"]):
+                        return APIEndpointFinding(
+                            url=target_url,
+                            path=candidate["path"],
+                            endpoint_type=candidate["type"],
+                            category=cat,
+                            status_code=resp.status_code,
+                            content_type=content_type,
+                            evidence=f"Spring Boot Actuator active: Keys: {list(act_data.keys())[:5]}",
+                            remediation="Set 'management.endpoints.web.exposure.exclude=*' and isolate actuator ports to localhost.",
+                        )
+                except Exception:
+                    pass
+
+        except requests.RequestException:
+            pass
+        return None
+
     def scan_endpoints(self) -> list[dict[str, Any]]:
         """
         Execute API endpoint discovery across known paths with zero false positive checks.
+        Uses multi-threaded worker pool for fast execution.
         """
         logger.info(f"Auditing API endpoints & schemas on [bold magenta]{self.url}[/bold magenta]...")
         self._profile_baseline()
 
         findings: list[APIEndpointFinding] = []
-
-        for candidate in API_CANDIDATE_PATHS:
-            target_url = urljoin(self.url + "/", candidate["path"].lstrip("/"))
-            try:
-                resp = self.session.get(target_url, timeout=self.timeout, allow_redirects=True)
-                
-                # Filter out standard 404/403/500 errors and soft-404s
-                if resp.status_code not in (200, 204, 301, 302, 400):
-                    continue
-                if self._is_soft_404(resp):
-                    continue
-
-                content_type = resp.headers.get("Content-Type", "").lower()
-                body_text = resp.text[:15000].lower()
-                cat = candidate["category"]
-
-                # 1. OpenAPI / Swagger Schema Validation
-                if cat == "schema" and resp.status_code == 200:
-                    try:
-                        data = json.loads(resp.text)
-                        if isinstance(data, dict) and any(k in data for k in ["swagger", "openapi", "paths", "components"]):
-                            findings.append(APIEndpointFinding(
-                                url=target_url,
-                                path=candidate["path"],
-                                endpoint_type=candidate["type"],
-                                category=cat,
-                                status_code=resp.status_code,
-                                content_type=content_type,
-                                evidence=f"Valid JSON schema with keys: {[k for k in data.keys() if k in ['swagger', 'openapi', 'paths', 'info']]}",
-                                remediation="Restrict public schema access; require API gateway authentication or disable schema exposure in production.",
-                            ))
-                    except Exception:
-                        pass
-
-                # 2. Interactive Documentation Validation
-                elif cat == "docs" and resp.status_code == 200:
-                    if any(sig in body_text for sig in ["swagger-ui", "swagger ui", "redoc", "api documentation", "openapi"]):
-                        findings.append(APIEndpointFinding(
-                            url=target_url,
-                            path=candidate["path"],
-                            endpoint_type=candidate["type"],
-                            category=cat,
-                            status_code=resp.status_code,
-                            content_type=content_type,
-                            evidence=f"Interactive documentation UI confirmed (Found '{candidate['type']}').",
-                            remediation="Ensure interactive API consoles are protected behind internal network firewalls or OAuth2 login.",
-                        ))
-
-                # 3. GraphQL Endpoint Validation
-                elif cat == "graphql":
-                    # Send non-destructive probe to confirm live GraphQL schema
-                    is_graphql = False
-                    evidence_str = ""
-                    try:
-                        gql_resp = self.session.post(
-                            target_url,
-                            json={"query": "{__typename}"},
-                            timeout=self.timeout,
-                            headers={"Content-Type": "application/json"},
-                        )
-                        if gql_resp.status_code in (200, 400):
-                            gql_data = gql_resp.json()
-                            if "data" in gql_data or "errors" in gql_data:
-                                is_graphql = True
-                                evidence_str = f"GraphQL query response confirmed: {json.dumps(gql_data)[:100]}"
-                    except Exception:
-                        if "graphiql" in body_text or "graphql" in body_text:
-                            is_graphql = True
-                            evidence_str = "Interactive GraphiQL interface detected in HTML body."
-
-                    if is_graphql:
-                        findings.append(APIEndpointFinding(
-                            url=target_url,
-                            path=candidate["path"],
-                            endpoint_type=candidate["type"],
-                            category=cat,
-                            status_code=resp.status_code,
-                            content_type=content_type,
-                            evidence=evidence_str,
-                            remediation="Disable GraphQL introspection in production and apply rate-limiting/query depth restrictions.",
-                        ))
-
-                # 4. Spring Boot Actuator Validation
-                elif cat == "actuator" and resp.status_code == 200:
-                    try:
-                        act_data = json.loads(resp.text)
-                        if isinstance(act_data, dict) and any(k in act_data for k in ["_links", "status", "components", "propertySources"]):
-                            findings.append(APIEndpointFinding(
-                                url=target_url,
-                                path=candidate["path"],
-                                endpoint_type=candidate["type"],
-                                category=cat,
-                                status_code=resp.status_code,
-                                content_type=content_type,
-                                evidence=f"Spring Boot Actuator active: Keys: {list(act_data.keys())[:5]}",
-                                remediation="Set 'management.endpoints.web.exposure.exclude=*' and isolate actuator ports to localhost.",
-                            ))
-                    except Exception:
-                        pass
-
-            except requests.RequestException:
-                continue
+        max_workers = min(len(API_CANDIDATE_PATHS), 10)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_cand = {executor.submit(self._test_candidate, cand): cand for cand in API_CANDIDATE_PATHS}
+            for future in as_completed(future_to_cand):
+                try:
+                    res = future.result()
+                    if res:
+                        findings.append(res)
+                except Exception:
+                    pass
 
         logger.info(f"API reconnaissance completed: [bold cyan]{len(findings)}[/bold cyan] confirmed endpoints.")
         return [f.to_dict() for f in findings]

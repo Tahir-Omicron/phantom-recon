@@ -101,6 +101,53 @@ class AutonomousAuditor:
                 return
         self.findings.append(finding)
 
+    def _adapt_web_url_and_check_liveness(self, open_ports: dict[str, Any]) -> bool:
+        """
+        Dynamically determine if web services (HTTP/HTTPS) are responsive,
+        and adapt self.url to the active listening scheme and port.
+        """
+        # If user explicitly supplied scheme and/or port
+        if self.raw_target.startswith("http://") or self.raw_target.startswith("https://"):
+            return True
+
+        open_port_ints = set()
+        for p in open_ports.keys():
+            try:
+                open_port_ints.add(int(p))
+            except (ValueError, TypeError):
+                pass
+
+        # Case A: Port 443 is confirmed open
+        if 443 in open_port_ints:
+            self.url = f"https://{self.host}"
+            return True
+
+        # Case B: Port 80 is open and 443 is NOT open
+        if 80 in open_port_ints and 443 not in open_port_ints:
+            self.url = f"http://{self.host}"
+            return True
+
+        # Case C: Active probe if ports weren't scanned or neither 80/443 found
+        try:
+            requests.head(f"https://{self.host}", timeout=2.0, verify=False, allow_redirects=True)
+            self.url = f"https://{self.host}"
+            return True
+        except Exception:
+            pass
+
+        try:
+            requests.head(f"http://{self.host}", timeout=2.0, verify=False, allow_redirects=True)
+            self.url = f"http://{self.host}"
+            return True
+        except Exception:
+            pass
+
+        # If a port scan was executed and neither 80 nor 443 (or common web ports) are open
+        if open_port_ints and not any(p in open_port_ints for p in (80, 443, 8000, 8080, 8443)):
+            return False
+
+        return False
+
     def run_full_audit(self) -> dict[str, Any]:
         """
         Execute all reconnaissance and vulnerability assessment stages sequentially.
@@ -272,169 +319,197 @@ class AutonomousAuditor:
         except Exception as e:
             logger.debug(f"Stage 6 error: {e}")
 
+        # ─── Web Target Liveness & Protocol Resolution ────────────────
+        web_active = self._adapt_web_url_and_check_liveness(self.scan_data.get("ports", {}))
+        self.scan_data["web_active"] = web_active
+        self.scan_data["url"] = self.url
+        logger.info(f"Target web endpoint resolved to: [bold cyan]{self.url}[/bold cyan] (Web Active: {web_active})")
+
         # ─── Stage 7: Web Application Stack & Tech Fingerprinting ──────
         self._notify(7, "Web Application Reconnaissance & Stack Fingerprinting")
-        try:
-            from phantom_recon.core.web_recon import WebRecon
-            web_recon = WebRecon(url=self.url, timeout=self.timeout)
-            web_results = web_recon.run_full_recon()
-            self.scan_data["technologies"] = web_results.get("technologies", [])
-            self.scan_data["directories"] = web_results.get("directories", [])
-            self.scan_data["forms"] = web_results.get("forms", [])
-        except Exception as e:
-            logger.debug(f"Stage 7 error: {e}")
+        if web_active:
+            try:
+                from phantom_recon.core.web_recon import WebRecon
+                web_recon = WebRecon(url=self.url, timeout=self.timeout)
+                web_results = web_recon.run_full_recon()
+                self.scan_data["technologies"] = web_results.get("technologies", [])
+                self.scan_data["directories"] = web_results.get("directories", [])
+                self.scan_data["forms"] = web_results.get("forms", [])
+            except Exception as e:
+                logger.debug(f"Stage 7 error: {e}")
+        else:
+            logger.info(f"Target '{self.host}' has no active HTTP/HTTPS service. Skipping web app recon.")
 
         # ─── Stage 8: API Discovery & Schema Auditing ───────────────────
         self._notify(8, "API Discovery, Swagger/OpenAPI & GraphQL Auditing")
-        try:
-            from phantom_recon.core.api_scanner import APIScanner
-            api_scanner = APIScanner(url=self.url, timeout=self.timeout)
-            api_results = api_scanner.scan_endpoints()
-            self.scan_data["api_endpoints"] = api_results
+        if web_active:
+            try:
+                from phantom_recon.core.api_scanner import APIScanner
+                api_scanner = APIScanner(url=self.url, timeout=self.timeout)
+                api_results = api_scanner.scan_endpoints()
+                self.scan_data["api_endpoints"] = api_results
 
-            for api in api_results:
-                sev = api.get("severity", "low")
-                if sev in ("medium", "high", "critical"):
-                    self._add_finding(AuditFinding(
-                        title=f"Exposed API Schema / Portal ({api.get('type')})",
-                        severity=sev,
-                        cvss_score=5.3 if sev == "medium" else 7.5,
-                        category="API / Architecture",
-                        location=api.get("url", self.url),
-                        description=f"Publicly accessible {api.get('type')} endpoint at {api.get('path')} discloses application data contracts and backend routes.",
-                        remediation="Place API schemas and interactive consoles behind authentication in production environments.",
-                        evidence=api.get("evidence", ""),
-                        poc_url=api.get("url", self.url),
-                    ))
-        except Exception as e:
-            logger.debug(f"Stage 8 error: {e}")
+                for api in api_results:
+                    sev = api.get("severity", "low")
+                    if sev in ("medium", "high", "critical"):
+                        self._add_finding(AuditFinding(
+                            title=f"Exposed API Schema / Portal ({api.get('type')})",
+                            severity=sev,
+                            cvss_score=5.3 if sev == "medium" else 7.5,
+                            category="API / Architecture",
+                            location=api.get("url", self.url),
+                            description=f"Publicly accessible {api.get('type')} endpoint at {api.get('path')} discloses application data contracts and backend routes.",
+                            remediation="Place API schemas and interactive consoles behind authentication in production environments.",
+                            evidence=api.get("evidence", ""),
+                            poc_url=api.get("url", self.url),
+                        ))
+            except Exception as e:
+                logger.debug(f"Stage 8 error: {e}")
+        else:
+            logger.info(f"Skipping API audit because web service is not reachable on '{self.host}'.")
 
         # ─── Stage 9: CMS & Framework Security Audit ───────────────────
         self._notify(9, "CMS & Framework Security Audit (WordPress/Laravel/Django/.js.map)")
-        try:
-            from phantom_recon.core.cms_auditor import CMSAuditor
-            cms_auditor = CMSAuditor(url=self.url, timeout=self.timeout, verify_ssl=self.verify_ssl)
-            cms_results = cms_auditor.run_full_audit()
-            self.scan_data["cms"] = cms_results
+        if web_active:
+            try:
+                from phantom_recon.core.cms_auditor import CMSAuditor
+                cms_auditor = CMSAuditor(url=self.url, timeout=self.timeout, verify_ssl=self.verify_ssl)
+                cms_results = cms_auditor.run_full_audit()
+                self.scan_data["cms"] = cms_results
 
-            for cf in cms_results.get("findings", []):
-                self._add_finding(AuditFinding(
-                    title=cf["title"],
-                    severity=cf["severity"],
-                    cvss_score=cf.get("cvss_score", 5.0),
-                    category="CMS & Frameworks",
-                    location=cf.get("location", self.url),
-                    description=cf["description"],
-                    remediation=cf.get("remediation", "Update security configuration."),
-                    evidence=cf.get("evidence", ""),
-                    poc_url=cf.get("url", self.url),
-                    reproduce_curl=cf.get("reproduce_curl", f"curl -i -k '{cf.get('url', self.url)}'"),
-                ))
-        except Exception as e:
-            logger.debug(f"Stage 9 error: {e}")
+                for cf in cms_results.get("findings", []):
+                    self._add_finding(AuditFinding(
+                        title=cf["title"],
+                        severity=cf["severity"],
+                        cvss_score=cf.get("cvss_score", 5.0),
+                        category="CMS & Frameworks",
+                        location=cf.get("location", self.url),
+                        description=cf["description"],
+                        remediation=cf.get("remediation", "Update security configuration."),
+                        evidence=cf.get("evidence", ""),
+                        poc_url=cf.get("url", self.url),
+                        reproduce_curl=cf.get("reproduce_curl", f"curl -i -k '{cf.get('url', self.url)}'"),
+                    ))
+            except Exception as e:
+                logger.debug(f"Stage 9 error: {e}")
+        else:
+            logger.info(f"Skipping CMS audit because web service is not reachable on '{self.host}'.")
 
         # ─── Stage 10: Security Headers & Cookie Security ──────────────
         self._notify(10, "Security Headers, CSP Directives & Cookie Security")
-        try:
-            from phantom_recon.core.header_analyzer import HeaderAnalyzer
-            header_analyzer = HeaderAnalyzer(url=self.url, timeout=self.timeout)
-            header_results = header_analyzer.analyze()
-            self.scan_data["headers"] = header_results
+        if web_active:
+            try:
+                from phantom_recon.core.header_analyzer import HeaderAnalyzer
+                header_analyzer = HeaderAnalyzer(url=self.url, timeout=self.timeout)
+                header_results = header_analyzer.analyze()
+                self.scan_data["headers"] = header_results
 
-            # Check critical missing headers
-            for chk in header_results.get("checks", []):
-                if not chk.get("secure") and chk.get("header") in ("Strict-Transport-Security", "Content-Security-Policy"):
-                    self._add_finding(AuditFinding(
-                        title=f"Missing Security Header ({chk.get('header')})",
-                        severity="low" if chk.get("header") == "Strict-Transport-Security" else "medium",
-                        cvss_score=3.7 if chk.get("header") == "Strict-Transport-Security" else 5.0,
-                        category="Web Defense / Headers",
-                        location=f"Response Headers: {chk.get('header')}",
-                        description=chk.get("description", "Security header is missing from server responses."),
-                        remediation=chk.get("recommendation", "Implement standard defense header in reverse proxy or web server configuration."),
-                        evidence=f"Header '{chk.get('header')}' was not returned.",
-                        poc_url=self.url,
-                    ))
-        except Exception as e:
-            logger.debug(f"Stage 10 error: {e}")
+                # Check critical missing headers
+                for chk in header_results.get("checks", []):
+                    if not chk.get("secure") and chk.get("header") in ("Strict-Transport-Security", "Content-Security-Policy"):
+                        self._add_finding(AuditFinding(
+                            title=f"Missing Security Header ({chk.get('header')})",
+                            severity="low" if chk.get("header") == "Strict-Transport-Security" else "medium",
+                            cvss_score=3.7 if chk.get("header") == "Strict-Transport-Security" else 5.0,
+                            category="Web Defense / Headers",
+                            location=f"Response Headers: {chk.get('header')}",
+                            description=chk.get("description", "Security header is missing from server responses."),
+                            remediation=chk.get("recommendation", "Implement standard defense header in reverse proxy or web server configuration."),
+                            evidence=f"Header '{chk.get('header')}' was not returned.",
+                            poc_url=self.url,
+                        ))
+            except Exception as e:
+                logger.debug(f"Stage 10 error: {e}")
+        else:
+            logger.info(f"Skipping security headers audit because web service is not reachable on '{self.host}'.")
 
         # ─── Stage 11: SSL/TLS Cryptographic Analysis ──────────────────
         self._notify(11, "SSL/TLS Protocol Inspection & Cryptographic Hygiene")
         if self.target_type in ("domain", "url"):
-            try:
-                from phantom_recon.core.ssl_analyzer import SSLAnalyzer
-                ssl_analyzer = SSLAnalyzer(host=self.host, timeout=self.timeout)
-                ssl_results = ssl_analyzer.analyze()
-                self.scan_data["ssl"] = ssl_results
+            open_ports = self.scan_data.get("ports", {})
+            has_443 = "443" in open_ports or 443 in open_ports or self.url.startswith("https://")
+            if has_443:
+                try:
+                    from phantom_recon.core.ssl_analyzer import SSLAnalyzer
+                    ssl_analyzer = SSLAnalyzer(host=self.host, timeout=min(self.timeout, 4.0))
+                    ssl_results = ssl_analyzer.analyze()
+                    self.scan_data["ssl"] = ssl_results
 
-                cert = ssl_results.get("certificate", {})
-                if cert.get("expired"):
-                    self._add_finding(AuditFinding(
-                        title="Expired SSL/TLS Certificate",
-                        severity="high",
-                        cvss_score=7.4,
-                        category="Cryptographic / SSL",
-                        location=f"TLS Service: {self.host}:443",
-                        description=f"The SSL/TLS certificate expired on {cert.get('not_after')}. Browsers will block connections.",
-                        remediation="Renew and deploy an active SSL/TLS certificate immediately.",
-                        evidence=f"Certificate expired on {cert.get('not_after')}",
-                        poc_url=f"https://{self.host}",
-                    ))
-            except Exception as e:
-                logger.debug(f"Stage 11 error: {e}")
+                    cert = ssl_results.get("certificate", {})
+                    if cert.get("expired"):
+                        self._add_finding(AuditFinding(
+                            title="Expired SSL/TLS Certificate",
+                            severity="high",
+                            cvss_score=7.4,
+                            category="Cryptographic / SSL",
+                            location=f"TLS Service: {self.host}:443",
+                            description=f"The SSL/TLS certificate expired on {cert.get('not_after')}. Browsers will block connections.",
+                            remediation="Renew and deploy an active SSL/TLS certificate immediately.",
+                            evidence=f"Certificate expired on {cert.get('not_after')}",
+                            poc_url=f"https://{self.host}",
+                        ))
+                except Exception as e:
+                    logger.debug(f"Stage 11 error: {e}")
+            else:
+                logger.info(f"Target '{self.host}' does not expose HTTPS port 443. SSL inspection skipped.")
 
         # ─── Stage 12: HTTP Methods & Dangerous Verbs Audit ────────────
         self._notify(12, "HTTP Methods & Dangerous Verbs Audit (PUT/DELETE/TRACE/WebDAV)")
-        try:
-            from phantom_recon.core.http_methods import HTTPMethodsAuditor
-            methods_auditor = HTTPMethodsAuditor(url=self.url, timeout=self.timeout)
-            methods_results = methods_auditor.audit_all()
-            self.scan_data["http_methods"] = methods_results
+        if web_active:
+            try:
+                from phantom_recon.core.http_methods import HTTPMethodsAuditor
+                methods_auditor = HTTPMethodsAuditor(url=self.url, timeout=self.timeout)
+                methods_results = methods_auditor.audit_all()
+                self.scan_data["http_methods"] = methods_results
 
-            for p in methods_results.get("probes", []):
-                if p.get("is_vulnerable"):
-                    self._add_finding(AuditFinding(
-                        title=f"Insecure HTTP Method Enabled ({p.get('method')})",
-                        severity=p.get("risk", "medium").lower(),
-                        cvss_score=7.5 if p.get("method") == "PUT" else (5.3 if p.get("method") == "TRACE" else 6.5),
-                        category="HTTP Protocol / Verbs",
-                        location=f"HTTP Verb: {p.get('method')} on {self.url}",
-                        description=f"The server allows {p.get('method')} method, presenting security exposure to unauthenticated modifications or XST attacks.",
-                        remediation=p.get("remediation", "Disable unsafe HTTP methods in web server configuration."),
-                        evidence=p.get("evidence", ""),
-                        poc_url=self.url,
-                        reproduce_curl=f"curl -i -X {p.get('method')} -k '{self.url}'",
-                    ))
-        except Exception as e:
-            logger.debug(f"Stage 12 error: {e}")
+                for p in methods_results.get("probes", []):
+                    if p.get("is_vulnerable"):
+                        self._add_finding(AuditFinding(
+                            title=f"Insecure HTTP Method Enabled ({p.get('method')})",
+                            severity=p.get("risk", "medium").lower(),
+                            cvss_score=7.5 if p.get("method") == "PUT" else (5.3 if p.get("method") == "TRACE" else 6.5),
+                            category="HTTP Protocol / Verbs",
+                            location=f"HTTP Verb: {p.get('method')} on {self.url}",
+                            description=f"The server allows {p.get('method')} method, presenting security exposure to unauthenticated modifications or XST attacks.",
+                            remediation=p.get("remediation", "Disable unsafe HTTP methods in web server configuration."),
+                            evidence=p.get("evidence", ""),
+                            poc_url=self.url,
+                            reproduce_curl=f"curl -i -X {p.get('method')} -k '{self.url}'",
+                        ))
+            except Exception as e:
+                logger.debug(f"Stage 12 error: {e}")
+        else:
+            logger.info(f"Skipping HTTP methods audit because web service is not reachable on '{self.host}'.")
 
         # ─── Stage 13: Precision Web Vulnerability Scanner ─────────────
         self._notify(13, "Precision Web Vulnerability Scanner & Deep Configuration Audit")
-        try:
-            from phantom_recon.core.vuln_scanner import VulnerabilityScanner
-            vuln_scanner = VulnerabilityScanner(
-                url=self.url,
-                timeout=self.timeout,
-                verify_ssl=self.verify_ssl,
-            )
-            # Run core checks (sensitive files, cors, open redirect, clickjacking, git/env)
-            web_vulns = vuln_scanner.scan_all()
+        if web_active:
+            try:
+                from phantom_recon.core.vuln_scanner import VulnerabilityScanner
+                vuln_scanner = VulnerabilityScanner(
+                    url=self.url,
+                    timeout=self.timeout,
+                    verify_ssl=self.verify_ssl,
+                )
+                web_vulns = vuln_scanner.scan_all()
 
-            for wv in web_vulns:
-                self._add_finding(AuditFinding(
-                    title=wv["title"],
-                    severity=wv["severity"],
-                    cvss_score=wv.get("cvss_score", 5.0),
-                    category=wv.get("category", "Web Vulnerability").replace("_", " ").title(),
-                    location=wv.get("location", self.url),
-                    description=wv["description"],
-                    remediation=wv.get("remediation", ""),
-                    evidence=wv.get("evidence", ""),
-                    poc_url=wv.get("poc_url", self.url),
-                    reproduce_curl=wv.get("reproduce_curl", f"curl -i -k '{self.url}'"),
-                ))
-        except Exception as e:
-            logger.debug(f"Stage 13 error: {e}")
+                for wv in web_vulns:
+                    self._add_finding(AuditFinding(
+                        title=wv["title"],
+                        severity=wv["severity"],
+                        cvss_score=wv.get("cvss_score", 5.0),
+                        category=wv.get("category", "Web Vulnerability").replace("_", " ").title(),
+                        location=wv.get("location", self.url),
+                        description=wv["description"],
+                        remediation=wv.get("remediation", ""),
+                        evidence=wv.get("evidence", ""),
+                        poc_url=wv.get("poc_url", self.url),
+                        reproduce_curl=wv.get("reproduce_curl", f"curl -i -k '{self.url}'"),
+                    ))
+            except Exception as e:
+                logger.debug(f"Stage 13 error: {e}")
+        else:
+            logger.info(f"Skipping deep web vulnerability audit because web service is not reachable on '{self.host}'.")
 
         # ─── Final Aggregation, Sorting & Scoring ──────────────────────
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
