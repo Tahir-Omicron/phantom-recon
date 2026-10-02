@@ -82,7 +82,7 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.9.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
+            "[dim]📌 Version 2.0.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing & defensive posture assessment only[/dim yellow]",
             border_style="red",
             box=box.ROUNDED,
@@ -211,6 +211,12 @@ def print_command_palette() -> None:
     # Category: Master Automation & Reports
     table.add_row(
         "📊 Master & Report",
+        "audit",
+        "phantom audit site.com",
+        "★ Single-command start-to-finish full recon & vulnerability audit with direct table."
+    )
+    table.add_row(
+        "📊 Master & Report",
         "full",
         "phantom full -t site.com -o report.html",
         "Master 13-step full autonomous recon & vulnerability pipeline + HTML report."
@@ -234,6 +240,7 @@ def print_command_palette() -> None:
     console.print(
         Panel(
             "[bold white]🚀 Quick-Start Command Cheat Sheet:[/bold white]\n"
+            "  [dim]•[/dim] [bold green]phantom audit example.com[/bold green]                         → [dim]★ Single-command full audit (all modules) with direct findings table[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom vuln -u https://example.com -o report.html[/cyan]  → [dim]Full web vulnerability assessment + HTML dashboard[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom cms -u https://example.com[/cyan]                   → [dim]Audit WordPress, Laravel, Django & .js.map source code leaks[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom methods -u https://example.com[/cyan]               → [dim]Audit dangerous HTTP verbs (PUT, DELETE, TRACE, WebDAV)[/dim]\n"
@@ -369,6 +376,71 @@ def print_vulnerabilities_matrix(
 
     console.print(table)
     console.print()
+
+
+def print_audit_findings_table(
+    vulns: list[dict],
+    target: str,
+    duration: float = 0.0,
+) -> None:
+    """
+    Renders the unified, comprehensive vulnerability & findings matrix table
+    directly in the terminal for the user upon single-command audit completion.
+    """
+    console.print()
+    if not vulns:
+        console.print(Panel(
+            "[bold green]✓ TƏBƏRÜK! Hədəf sistemdə heç bir kritik və ya təsdiqlənmiş zəiflik aşkar edilmədi.[/bold green]\n"
+            f"[dim white]Hədəf: [bold cyan]{target}[/bold cyan] | Bütün 13 təhlükəsizlik nəzarət modulu yoxlanıldı ({duration:.2f}s).[/dim white]",
+            title="🛡️  Audit Yekunu: TƏMİZ VƏ TƏHLÜKƏSİZ SİSTEM (A+)",
+            border_style="green",
+            box=box.ROUNDED,
+        ))
+        console.print()
+        return
+
+    table = Table(
+        title=f"🛡️  BÜTÖV AUDİT VƏ TƏHLÜKƏSİZLİK BOŞLUQLARI CƏDVƏLİ — {target} ({len(vulns)} Boşluq / {duration:.2f}s)",
+        title_style="bold red",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+        show_lines=True,
+        header_style="bold cyan",
+    )
+    table.add_column("#", justify="center", style="bold dim", width=4)
+    table.add_column("Dərəcə\n(Severity)", justify="center", width=12)
+    table.add_column("Kateqoriya\n(Category)", style="bold yellow", width=16)
+    table.add_column("Boşluğun Adı\n(Vulnerability Name)", style="bold white", width=26)
+    table.add_column("Aşkarlanmış Məkan\n(Affected Location)", style="cyan", width=24)
+    table.add_column("Təsvir və Real Təsiri\n(Description & Impact)", style="white", min_width=30)
+    table.add_column("Düzəliş / Həll Yolu\n(Remediation / Fix)", style="green", min_width=24)
+
+    for idx, v in enumerate(vulns, 1):
+        if not isinstance(v, dict):
+            continue
+        sev = v.get("severity", "info")
+        badge = severity_badge(sev)
+        if v.get("cvss_score"):
+            badge += f"\n[dim]CVSS {v['cvss_score']}[/dim]"
+        cat = v.get("category", "General")
+        title_text = v.get("title", "Finding")
+        loc = v.get("location", "Global Target")
+        desc = v.get("description", "No description provided.")
+        remedy = v.get("remediation", "Review security policy.")
+
+        table.add_row(
+            str(idx),
+            badge,
+            cat,
+            title_text,
+            loc,
+            desc,
+            remedy,
+        )
+
+    console.print(table)
+    console.print()
+
 
 
 def success(msg: str) -> None:

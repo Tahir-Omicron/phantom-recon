@@ -32,6 +32,7 @@ from phantom_recon.utils.logger import (
     print_vulnerabilities_matrix,
     print_scan_summary,
     print_security_score_gauge,
+    print_audit_findings_table,
     severity_badge,
 )
 from phantom_recon import __version__
@@ -815,223 +816,141 @@ def report(ctx, input_file, report_format, output):
     success(f"Report generated: {output}")
 
 
-# ─── Full Recon Pipeline ────────────────────────────────────────
-@main.command()
-@click.option("--target", "-t", required=True, help="Target domain or IP.")
-@click.option("--output", "-o", default="phantom_report.html", help="Output report file.")
-@click.pass_context
-def full(ctx, target, output):
-    """🎯 Full reconnaissance pipeline with web fingerprinting and zero-false-positive audit."""
+# ─── Master Autonomous Audit Executor ───────────────────────────
+def _execute_autonomous_audit(
+    ctx: click.Context,
+    target_input: Optional[str],
+    output: Optional[str] = None,
+    fast: bool = False,
+    threads: int = 25,
+    timeout: float = 6.0,
+) -> None:
+    """Executes the master 13-stage autonomous audit and prints findings table directly."""
+    if not target_input:
+        print_banner()
+        error("Hədəf təyin edilməyib! Zəhmət olmasa audit aparılacaq hədəfi daxil edin.")
+        console.print("[dim white]  İstifadə: [bold cyan]phantom audit example.com[/bold cyan]")
+        console.print("[dim white]  İstifadə: [bold cyan]phantom audit -u https://example.com[/bold cyan]")
+        console.print("[dim white]  İstifadə: [bold cyan]phantom audit 192.168.1.1 --fast[/bold cyan]\n")
+        return
+
     print_banner()
-    section_header("Full Recon Pipeline")
-    info(f"Target: {target}")
+    from rich.panel import Panel
+    from rich import box
+    from phantom_recon.utils.validators import normalize_target_input
 
-    all_results: dict = {"target": target, "timestamp": datetime.now().isoformat()}
-
-    # 1. WHOIS
     try:
-        section_header("Step 1/13: WHOIS Lookup")
-        from phantom_recon.core.whois_lookup import WhoisLookup
-        whois_data = WhoisLookup(target=target).lookup()
-        all_results["whois"] = whois_data
-        success("WHOIS complete")
+        host, base_url, target_type = normalize_target_input(target_input)
     except Exception as e:
-        warning(f"WHOIS failed: {e}")
+        error(f"Yanlış hədəf formatı: {e}")
+        return
 
-    # 2. DNS
-    try:
-        section_header("Step 2/13: DNS Enumeration")
-        from phantom_recon.core.dns_enum import DNSEnumerator
-        dns_data = DNSEnumerator(domain=target).enumerate_all()
-        all_results["dns"] = dns_data
-        success("DNS enumeration complete")
-    except Exception as e:
-        warning(f"DNS failed: {e}")
+    console.print(Panel(
+        f"🎯 [bold white]Hədəf Host / Domen:[/bold white] [bold cyan]{host}[/bold cyan]\n"
+        f"🔗 [bold white]Web Giriş URL:[/bold white]       [bold green]{base_url}[/bold green]\n"
+        f"🏷️  [bold white]Hədəf Tipi:[/bold white]         [yellow]{target_type.upper()}[/yellow] | Rejim: {'[bold yellow]SÜRƏTLİ (FAST)[/bold yellow]' if fast else '[bold cyan]DƏRİN AUDİT (DEEP)[/bold cyan]'}\n"
+        f"⏱️  [bold white]Başlama Zamanı:[/bold white]     {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        title="🚀 [bold yellow]Master Avtonom Pentest və Təhlükəsizlik Auditi[/bold yellow]",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+    ))
+    console.print()
 
-    # 3. Subdomain Discovery
-    try:
-        section_header("Step 3/13: Subdomain Discovery")
-        from phantom_recon.core.subdomain import SubdomainFinder
-        subs = SubdomainFinder(domain=target, threads=20).find_all()
-        all_results["subdomains"] = subs
-        success(f"Found {len(subs)} subdomains")
-    except Exception as e:
-        warning(f"Subdomain discovery failed: {e}")
+    section_header("Avtonom Boru Kəməri İcra Edilir (13 Mərhələ)")
 
-    # 4. WAF & Origin IP Audit
-    try:
-        section_header("Step 4/13: WAF & Origin IP Leakage Audit")
-        from phantom_recon.core.waf_detector import WAFDetector
-        waf_data = WAFDetector(target=target).run_full_waf_analysis()
-        all_results["waf"] = waf_data
-        if waf_data.get("has_waf"):
-            warning(f"Target is fronted by {waf_data.get('waf_name')} CDN/WAF!")
-            if waf_data.get("origin_leakage", {}).get("leakage_detected"):
-                error("🚨 Potential unproxied origin server IP leakage detected!")
-        else:
-            success("No cloud WAF edge proxy detected (direct host)")
-    except Exception as e:
-        warning(f"WAF audit failed: {e}")
+    from phantom_recon.core.autonomous_auditor import AutonomousAuditor
+    auditor = AutonomousAuditor(
+        target=target_input,
+        threads=threads,
+        timeout=timeout,
+        fast_mode=fast,
+        status_callback=lambda st, tot, desc: console.print(f"  [dim cyan]•[/dim cyan] [bold white][{st}/{tot}][/bold white] [dim]{desc}...[/dim]"),
+    )
 
-    # 5. Cloud Storage Audit
-    try:
-        section_header("Step 5/13: Cloud Storage & Bucket Leakage Audit")
-        from phantom_recon.core.cloud_auditor import CloudAuditor
-        cloud_results = CloudAuditor(target=target, threads=20).run_cloud_audit()
-        all_results["cloud_storage"] = cloud_results
-        open_b = cloud_results.get("open_buckets_count", 0)
-        prot_b = cloud_results.get("protected_buckets_count", 0)
-        if open_b > 0:
-            error(f"🚨 Found {open_b} PUBLICLY LISTABLE cloud storage buckets!")
-        else:
-            success(f"Cloud audit complete: 0 open buckets ({prot_b} protected)")
-    except Exception as e:
-        warning(f"Cloud storage audit failed: {e}")
+    results = auditor.run_full_audit()
 
-    # 6. Port Scan
-    try:
-        section_header("Step 6/13: Port Scanning")
-        from phantom_recon.core.scanner import PortScanner
-        scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
-        all_results["ports"] = scan_results.get("ports", {})
-        success(f"Found {scan_results.get('open_ports_count', 0)} open ports")
-    except Exception as e:
-        warning(f"Port scan failed: {e}")
+    # 1. Direct Unified Table of Discovered Vulnerabilities
+    vulns = results.get("vulnerabilities", [])
+    duration = results.get("duration_seconds", 0.0)
+    print_audit_findings_table(vulns, host, duration)
 
-    # 7. Web Reconnaissance
-    try:
-        section_header("Step 7/13: Web Application Reconnaissance")
-        from phantom_recon.core.web_recon import WebRecon
-        url = f"https://{target}" if not target.startswith("http") else target
-        web_results = WebRecon(url=url).run_full_recon()
-        all_results["technologies"] = web_results.get("technologies", [])
-        all_results["directories"] = web_results.get("directories", [])
-        all_results["forms"] = web_results.get("forms", [])
-        success(f"Detected {len(all_results['technologies'])} technologies and {len(all_results['directories'])} directories")
-    except Exception as e:
-        warning(f"Web reconnaissance failed: {e}")
+    # 2. Reproduction PoC Commands for high/critical findings
+    if vulns:
+        console.print("[bold yellow]📍 TƏKRARLAMA (PROOF-OF-CONCEPT) VƏ BİRBAŞA ƏLAQƏ ƏMRLƏRİ:[/bold yellow]\n")
+        for idx, v in enumerate(vulns[:8], 1):
+            poc_link = v.get("poc_url") or base_url
+            curl_cmd = v.get("reproduce_curl") or f"curl -i -k '{poc_link}'"
+            console.print(f"  [bold white]#{idx} {v['title']}[/bold white] ({severity_badge(v['severity'])})")
+            console.print(f"     [bold cyan]📍 Məkan:[/bold cyan]    {v.get('location', 'Global')}")
+            console.print(f"     [bold green]🔗 Birbaşa:[/bold green]  [link={poc_link}][bold underline cyan]{poc_link}[/bold underline cyan][/link]")
+            console.print(f"     [bold magenta]💻 PoC cURL:[/bold magenta] [dim]{curl_cmd}[/dim]")
+            if v.get("evidence"):
+                console.print(f"     [dim]📋 Sübut:    {v.get('evidence')[:120]}...[/dim]")
+            console.print(f"     [bold green]💡 Düzəliş:[/bold green]   {v.get('remediation', 'N/A')}\n")
 
-    # 8. API Discovery
-    try:
-        section_header("Step 8/13: API & Architecture Discovery")
-        from phantom_recon.core.api_scanner import APIScanner
-        url = f"https://{target}" if not target.startswith("http") else target
-        api_results = APIScanner(url=url).scan_endpoints()
-        all_results["api_endpoints"] = api_results
-        success(f"Discovered {len(api_results)} API endpoints / schemas")
-    except Exception as e:
-        warning(f"API discovery failed: {e}")
-
-    # 9. CMS & Framework Security Audit
-    try:
-        section_header("Step 9/13: CMS & Framework Security Audit")
-        from phantom_recon.core.cms_auditor import CMSAuditor
-        url = f"https://{target}" if not target.startswith("http") else target
-        cms_results = CMSAuditor(url=url).run_full_audit()
-        all_results["cms"] = cms_results
-        detected_cms = cms_results.get("detected_cms", [])
-        if detected_cms:
-            info(f"Identified Frameworks/CMS: [bold green]{', '.join(detected_cms)}[/bold green]")
-        cms_findings = cms_results.get("findings", [])
-        if cms_findings:
-            warning(f"Discovered {len(cms_findings)} CMS / framework security exposures!")
-        else:
-            success("CMS audit clean: No debug logs or sensitive exposures discovered.")
-    except Exception as e:
-        warning(f"CMS security audit failed: {e}")
-
-    # 10. Header Analysis
-    try:
-        section_header("Step 10/13: Header Analysis")
-        from phantom_recon.core.header_analyzer import HeaderAnalyzer
-        url = f"https://{target}" if not target.startswith("http") else target
-        header_data = HeaderAnalyzer(url=url).analyze()
-        all_results["headers"] = header_data
-        success(f"Header grade: {header_data.get('grade', 'N/A')}")
-    except Exception as e:
-        warning(f"Header analysis failed: {e}")
-
-    # 11. SSL Analysis
-    try:
-        section_header("Step 11/13: SSL/TLS Analysis")
-        from phantom_recon.core.ssl_analyzer import SSLAnalyzer
-        ssl_data = SSLAnalyzer(host=target).analyze()
-        all_results["ssl"] = ssl_data
-        success(f"SSL grade: {ssl_data.get('grade', 'N/A')}")
-    except Exception as e:
-        warning(f"SSL analysis failed: {e}")
-
-    # 12. HTTP Methods & Dangerous Verbs Audit
-    try:
-        section_header("Step 12/13: HTTP Methods & Dangerous Verbs Audit")
-        from phantom_recon.core.http_methods import HTTPMethodsAuditor
-        url = f"https://{target}" if not target.startswith("http") else target
-        methods_data = HTTPMethodsAuditor(url=url).audit_all()
-        all_results["http_methods"] = methods_data
-        adv = methods_data.get("advertised_methods", [])
-        if adv:
-            info(f"Discovered advertised methods: [bold green]{', '.join(adv)}[/bold green]")
-        d_vulns = methods_data.get("vulnerabilities", [])
-        if d_vulns:
-            warning(f"Discovered {len(d_vulns)} insecure HTTP method findings.")
-        else:
-            success("HTTP method audit clean: No dangerous verbs exposed.")
-    except Exception as e:
-        warning(f"HTTP methods audit failed: {e}")
-
-    # 13. Vulnerability Scan
-    try:
-        section_header("Step 13/13: Vulnerability Scan & Matrix Analysis")
-        from phantom_recon.core.vuln_scanner import VulnerabilityScanner
-        url = f"https://{target}" if not target.startswith("http") else target
-        scanner = VulnerabilityScanner(url=url)
-        vuln_data = scanner.scan_all()
-        all_results["vulnerabilities"] = vuln_data
-        success(f"Found {len(vuln_data)} verified vulnerabilities")
-        if vuln_data:
-            print_vulnerabilities_matrix(vuln_data, f"Vulnerability Assessment & Explanations Matrix — {target}")
-            console.print("[bold yellow]📍 DETAILED REPRODUCTION PROOF-OF-CONCEPT & DIRECT ACCESS:[/bold yellow]\n")
-            for idx, v in enumerate(vuln_data, 1):
-                poc_link = v.get("poc_url") or url
-                curl_cmd = v.get("reproduce_curl") or f"curl -i -k '{poc_link}'"
-                console.print(f"  [bold white]#{idx} {v['title']}[/bold white] ({severity_badge(v['severity'])})")
-                console.print(f"     [bold cyan]📍 Location:[/bold cyan]    {v.get('location', 'Global Application')}")
-                console.print(f"     [bold green]🔗 Direct Link:[/bold green]  [link={poc_link}][bold underline cyan]{poc_link}[/bold underline cyan][/link]")
-                console.print(f"     [bold magenta]💻 PoC cURL:[/bold magenta]    [dim]{curl_cmd}[/dim]")
-                if v.get("evidence"):
-                    console.print(f"     [dim]📋 Evidence:    {v.get('evidence')[:120]}...[/dim]")
-                console.print(f"     [bold green]💡 Fix:[/bold green]         {v.get('remediation', 'N/A')}\n")
-
-        # Security Posture Scorecard
-        from phantom_recon.reporting.security_score import calculate_security_score
-        score_data = calculate_security_score(vuln_data)
-        all_results["security_score"] = score_data
+    # 3. Security Posture Scorecard
+    score_data = results.get("security_score", {})
+    if score_data:
         print_security_score_gauge(score_data)
-    except Exception as e:
-        warning(f"Vulnerability scan failed: {e}")
 
-    # Generate report
-    section_header("Generating Report")
+    # 4. Generate Reports
+    sanitized_host = host.replace(":", "_").replace("/", "_").replace(".", "_")
+    report_path = output or f"phantom_audit_{sanitized_host}.html"
+
+    section_header("Audit Hesabatlarının Hazırlanması")
     from phantom_recon.reporting.report_generator import ReportGenerator
-    generator = ReportGenerator(scan_data=all_results)
+    generator = ReportGenerator(scan_data=results)
 
-    if output.endswith(".csv"):
-        generator.generate_csv(output)
-    elif output.endswith(".md") or output.endswith(".markdown"):
-        generator.generate_markdown(output)
-    elif output.endswith(".json"):
-        generator.generate_json(output)
-    elif output.endswith(".txt"):
-        generator.generate_text(output)
+    if report_path.endswith(".csv"):
+        generator.generate_csv(report_path)
+    elif report_path.endswith(".md") or report_path.endswith(".markdown"):
+        generator.generate_markdown(report_path)
+    elif report_path.endswith(".json"):
+        generator.generate_json(report_path)
+    elif report_path.endswith(".txt"):
+        generator.generate_text(report_path)
     else:
-        generator.generate_html(output)
+        generator.generate_html(report_path)
 
-    success(f"Full report saved: {output}")
+    success(f"İnteraktiv HTML Hesabatı saxlanıldı: [bold underline cyan]{report_path}[/bold underline cyan]")
 
-    # Also save JSON
-    json_output = output.rsplit(".", 1)[0] + ".json"
-    generator.generate_json(json_output)
-    info(f"JSON data saved: {json_output}")
+    # Also automatically save JSON database deliverable
+    json_path = report_path.rsplit(".", 1)[0] + ".json"
+    generator.generate_json(json_path)
+    info(f"Strukturlaşdırılmış JSON məlumatı saxlanıldı: [bold]{json_path}[/bold]")
+
+
+# ─── Master Autonomous Audit (Single Command Start-to-Finish) ───
+@main.command(name="audit")
+@click.argument("target_arg", required=False)
+@click.option("--target", "-t", default=None, help="Target domain, URL, or IP address.")
+@click.option("--url", "-u", default=None, help="Target application URL.")
+@click.option("--output", "-o", default=None, help="Output report file.")
+@click.option("--fast", is_flag=True, help="Fast scan mode (skips heavy port sweep).")
+@click.option("--threads", default=25, help="Concurrent worker threads.")
+@click.option("--timeout", default=6.0, help="Per-request timeout in seconds.")
+@click.pass_context
+def audit_cmd(ctx, target_arg, target, url, output, fast, threads, timeout):
+    """★ Single-command start-to-finish full recon & vulnerability audit with direct table."""
+    resolved_target = target_arg or target or url
+    _execute_autonomous_audit(ctx, resolved_target, output, fast, threads, timeout)
+
+
+# ─── Full Recon Pipeline (Alias to Master Audit) ────────────────
+@main.command(name="full")
+@click.argument("target_arg", required=False)
+@click.option("--target", "-t", default=None, help="Target domain, URL, or IP.")
+@click.option("--url", "-u", default=None, help="Target application URL.")
+@click.option("--output", "-o", default=None, help="Output report file.")
+@click.option("--fast", is_flag=True, help="Fast scan mode.")
+@click.option("--threads", default=25, help="Concurrent worker threads.")
+@click.option("--timeout", default=6.0, help="Per-request timeout in seconds.")
+@click.pass_context
+def full(ctx, target_arg, target, url, output, fast, threads, timeout):
+    """🎯 Full 13-stage autonomous reconnaissance and vulnerability audit."""
+    resolved_target = target_arg or target or url
+    _execute_autonomous_audit(ctx, resolved_target, output, fast, threads, timeout)
+
 
 
 def _save_output(ctx: click.Context, data: dict) -> None:

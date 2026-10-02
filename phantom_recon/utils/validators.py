@@ -232,3 +232,123 @@ TOP_100_PORTS = [
     6646, 7070, 8000, 8008, 8009, 8080, 8081, 8443, 8888, 9100, 9999, 10000,
     32768, 49152, 49153, 49154, 49155, 49156, 49157,
 ]
+
+DANGEROUS_SERVICES_PORTS = {
+    21: {
+        "service": "FTP",
+        "risk": "high",
+        "cvss": 7.5,
+        "title": "Exposed Plaintext FTP Service (Port 21)",
+        "desc": "Unencrypted File Transfer Protocol is accessible to the public, risking credential interception and brute-force access.",
+        "remediation": "Disable plaintext FTP and require SFTP/SSH or restrict port 21 via firewall.",
+    },
+    23: {
+        "service": "Telnet",
+        "risk": "critical",
+        "cvss": 9.8,
+        "title": "Exposed Legacy Plaintext Telnet Service (Port 23)",
+        "desc": "Unencrypted Telnet terminal service is exposed to the public Internet. Credentials and session data are transmitted in cleartext.",
+        "remediation": "Immediately disable Telnet daemon and replace with SSHv2.",
+    },
+    445: {
+        "service": "SMB",
+        "risk": "high",
+        "cvss": 8.5,
+        "title": "Exposed Microsoft SMB Service (Port 445)",
+        "desc": "Direct SMB file sharing is reachable from the public Internet, posing serious exposure to remote code execution and NTLM relay attacks.",
+        "remediation": "Block inbound TCP port 445 at the perimeter firewall.",
+    },
+    1433: {
+        "service": "MSSQL",
+        "risk": "high",
+        "cvss": 8.1,
+        "title": "Exposed Microsoft SQL Server Database (Port 1433)",
+        "desc": "Database engine port is publicly accessible, inviting targeted credential brute-force and data exfiltration.",
+        "remediation": "Place MSSQL behind a private subnet and require VPN access.",
+    },
+    3306: {
+        "service": "MySQL",
+        "risk": "high",
+        "cvss": 8.1,
+        "title": "Exposed MySQL Database Server (Port 3306)",
+        "desc": "Relational database server port is directly reachable from the Internet without VPN or network firewall restriction.",
+        "remediation": "Bind MySQL to 127.0.0.1 or internal private network interface only.",
+    },
+    5432: {
+        "service": "PostgreSQL",
+        "risk": "high",
+        "cvss": 8.1,
+        "title": "Exposed PostgreSQL Database Server (Port 5432)",
+        "desc": "PostgreSQL server is publicly accessible over the perimeter, presenting critical authentication brute-force exposure.",
+        "remediation": "Restrict PostgreSQL listen_addresses to localhost or VPC CIDR in postgresql.conf.",
+    },
+    6379: {
+        "service": "Redis",
+        "risk": "critical",
+        "cvss": 9.8,
+        "title": "Exposed Redis In-Memory Database (Port 6379)",
+        "desc": "Redis key-value store is exposed publicly. If unauthenticated, attackers can read all cache data, flush databases, or execute remote code via cron/SSH key writes.",
+        "remediation": "Bind Redis to 127.0.0.1, require strong authentication (requirepass), and block port 6379 at firewall.",
+    },
+    9200: {
+        "service": "Elasticsearch",
+        "risk": "high",
+        "cvss": 8.2,
+        "title": "Exposed Elasticsearch REST API (Port 9200)",
+        "desc": "Elasticsearch cluster API is reachable over HTTP without network segmentation, allowing unauthorized index dumps and cluster compromise.",
+        "remediation": "Enable Elastic Security authentication and restrict HTTP API access to backend servers.",
+    },
+    27017: {
+        "service": "MongoDB",
+        "risk": "high",
+        "cvss": 8.1,
+        "title": "Exposed MongoDB Database (Port 27017)",
+        "desc": "NoSQL MongoDB database port is directly reachable from the public Internet, exposing potential unauthenticated collections.",
+        "remediation": "Bind MongoDB to 127.0.0.1, enable authorization, and block port 27017 at firewall.",
+    },
+}
+
+
+def normalize_target_input(raw: str) -> tuple[str, str, str]:
+    """
+    Normalize any user-provided target string (domain, URL, IP, or IP:port) into:
+        (host, base_url, target_type)
+
+    Examples:
+        'example.com' -> ('example.com', 'https://example.com', 'domain')
+        'https://example.com/app/login' -> ('example.com', 'https://example.com', 'url')
+        'http://192.168.1.1:8080/test' -> ('192.168.1.1', 'http://192.168.1.1:8080', 'ipv4')
+        '192.168.1.1' -> ('192.168.1.1', 'http://192.168.1.1', 'ipv4')
+    """
+    clean = raw.strip()
+    if not clean:
+        raise ValueError("Target cannot be empty")
+
+    parsed = urlparse(clean)
+    if parsed.scheme in ("http", "https"):
+        host = parsed.hostname or clean
+        port_suffix = f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""
+        base_url = f"{parsed.scheme}://{host}{port_suffix}"
+        if validate_ip(host):
+            target_type = "ipv4" if validate_ipv4(host) else "ipv6"
+        else:
+            target_type = "url"
+    else:
+        # No protocol provided
+        if ":" in clean and not clean.startswith("["):
+            parts = clean.split(":", 1)
+            host = parts[0]
+            port_suffix = f":{parts[1]}"
+        else:
+            host = clean.split("/")[0]
+            port_suffix = ""
+
+        if validate_ip(host):
+            target_type = "ipv4" if validate_ipv4(host) else "ipv6"
+            base_url = f"http://{host}{port_suffix}"
+        else:
+            target_type = "domain" if validate_domain(host) else "unknown"
+            base_url = f"https://{host}{port_suffix}"
+
+    return host, base_url, target_type
+

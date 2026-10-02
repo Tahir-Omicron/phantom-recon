@@ -5,20 +5,20 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v1.9.0)</strong>
+  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v2.0.0)</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
-  <a href="#modules"><img src="https://img.shields.io/badge/modules-15+-red.svg?style=for-the-badge" alt="15+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-143%20passed-brightgreen.svg?style=for-the-badge" alt="143 Tests Passing"/></a>
+  <a href="#modules"><img src="https://img.shields.io/badge/modules-16+-red.svg?style=for-the-badge" alt="16+ Modules"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-159%20passed-brightgreen.svg?style=for-the-badge" alt="159 Tests Passing"/></a>
   <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v190">What's New in v1.9.0</a> •
+  <a href="#whats-new-in-v200">What's New in v2.0.0</a> •
   <a href="#release-history">Release History</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
@@ -30,39 +30,40 @@
 
 ---
 
-## 🚀 What's New in v1.9.0
+## 🚀 What's New in v2.0.0
 
-- 🧩 **CMS & Framework Security Auditor (`phantom cms`)**:
-  - Full automated architecture fingerprinting for **WordPress, Laravel, Django, Next.js, Drupal, Joomla, and Spring Boot**.
-  - **WordPress Security Audit**:
-    - User enumeration via REST API (`/wp-json/wp/v2/users`) extracting valid usernames and IDs for credential brute-force defense.
-    - Public XML-RPC interface detection (`/xmlrpc.php`) mitigating multi-call brute force and DDoS amplification.
-    - Public debug log leakage (`/wp-content/debug.log`) uncovering internal PHP stack traces and server variables.
-    - Exact version disclosure detection via `/readme.html`.
-  - **Laravel Framework Security Audit**:
-    - Unprotected application logs (`/storage/logs/laravel.log`) disclosing internal database errors and stack traces.
-    - Exposed Laravel Telescope debug assistant (`/telescope`) exposing HTTP requests, session tokens, and queries.
-  - **Admin Interface Discovery**: Identifies public access to Django Admin (`/admin/login/`), Drupal (`/user/login`), and Joomla (`/administrator/`).
-- 📜 **Frontend JavaScript Source Map Discovery (`.js.map`)**:
-  - Automatically identifies script tags, constructs and verifies `.js.map` file pairs with JSON schema validation (`version`, `sources`).
-  - Detects client-side source code disclosures allowing reverse engineering of proprietary frontend logic, TypeScript source files, and internal endpoints.
-- 🐳 **DevOps & Cloud Infrastructure Manifest Auditing**:
-  - Precision discovery of `/docker-compose.yml`, `/terraform.tfstate`, and `/Dockerfile`.
-  - Zero false positives: Protected with regex syntax matching and HTML soft-404 anti-reflection canary filters.
-- 🎯 **13-Stage Master Autonomous Reconnaissance Pipeline (`phantom full`)**:
-  - Integrates CMS & Framework Security Audit as Stage 9/13, executing end-to-end OSINT, infrastructure recon, and web application auditing.
-- 📊 **Synchronized Multi-Format Reports**:
-  - Dedicated CMS & Framework Architecture Audit section added across interactive HTML dashboard, GitHub-flavored Markdown, Plain Text, and CSV export.
-- 🧪 **Expanded Automated Test Suite (143 Passing Tests)**:
-  - 18 new automated tests for CMS auditing, source map detection, DevOps manifests, and report generation.
+- ⚡ **Single-Command Autonomous End-to-End Audit (`phantom audit <target>`)**:
+  - Perform an exhaustive, start-to-finish reconnaissance and vulnerability assessment with a **single command** — no need to run individual tools separately!
+  - Accepts raw target inputs (`example.com`, `https://example.com/app`, or `192.168.1.1`) with automated normalization into clean host and URL profiles.
+  - Optional `--fast` flag for rapid triage or deep multi-threaded analysis.
+- 🛡️ **Direct Terminal Vulnerability & Risk Matrix Table**:
+  - Immediately upon completion, renders a magnificent unified findings table directly in the terminal:
+    - Severity badge (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO`) + CVSS Score.
+    - Architecture Category (`DevOps`, `Cloud`, `CMS`, `Network`, `API`, `Web App`, `DNS`, `Crypto`).
+    - Finding / Vulnerability Name.
+    - Exact Affected Location or URL link.
+    - Technical Description & Real-World Impact (*Nədir & Təsiri*).
+    - Actionable Remediation Guidance (*Düzəliş / Həll Yolu*).
+- 🚨 **Perimeter Risky Services & Exposed Database Probing**:
+  - Identifies dangerous services exposed to the public Internet:
+    - **Port 23 (Telnet)**: Cleartext remote terminal daemon (Critical / CVSS 9.8).
+    - **Port 6379 (Redis)**: Unauthenticated in-memory cache/database (Critical / CVSS 9.8).
+    - **Port 445 (SMB)**: Direct file sharing exposure (High / CVSS 8.5).
+    - **Port 1433/3306/5432/27017 (MSSQL, MySQL, Postgres, MongoDB)**: Exposed database engines.
+    - **Port 21 (FTP)** & **Port 9200 (Elasticsearch)**.
+- 🎯 **Consolidated Finding Aggregator & Deduplication**:
+  - Aggregates findings from DNS spoofing, subdomain takeovers, unproxied origin IPs, open cloud buckets, perimeter services, CMS exposures, frontend source maps, and web vulnerabilities into a unified, deduplicated dataset sorted strictly by severity.
+- 🧪 **Expanded Automated Test Suite (159 Passing Tests)**:
+  - 16 new automated tests verifying target normalization, dangerous ports, autonomous auditor pipeline, findings table rendering, and CLI commands.
   - 100% test pass rate in under 4 seconds.
 
 ---
 
-## 📜 Release History & Changelog (v1.0.0 — v1.9.0)
+## 📜 Release History & Changelog (v1.0.0 — v2.0.0)
 
 | Version | Release Focus | Key Additions & Fixes |
 | :--- | :--- | :--- |
+| **v2.0.0** | **Single-Command Autonomous Audit, Direct Findings Table & Perimeter Risk Engine** | • Autonomous Master Audit Engine (`phantom audit <target>`) running end-to-end scans in 1 command.<br>• Direct unified terminal Vulnerability Matrix Table with severity, impact, and fixes.<br>• Automatic target normalization (domain, URL, IP).<br>• Perimeter database & risky service detection (Redis, Telnet, SMB, DBs).<br>• Modernized `phantom full` with unified engine.<br>• Expanded test suite to **159 passing tests**. |
 | **v1.9.0** | **CMS & Framework Auditor, DevOps Manifests & JavaScript Source Maps** | • CMS & Framework Security Auditor (`phantom cms`) supporting WordPress, Laravel, Django, Next.js, Drupal, Joomla, and Spring Boot.<br>• WordPress REST API user enumeration, XML-RPC exposure, and debug log detection.<br>• Laravel log disclosure and exposed Telescope dashboard.<br>• Frontend JavaScript Source Map (`.js.map`) leakage discovery.<br>• DevOps infrastructure checks: `/docker-compose.yml`, `/terraform.tfstate`, `/Dockerfile`.<br>• Master pipeline expanded to 13 automated stages (`phantom full`).<br>• Expanded test suite to **143 passing tests**. |
 | **v1.8.0** | **HTTP Methods Auditor, Security Score & Sleek Red Team Banner** | • HTTP Methods & Dangerous Verbs Auditor (`phantom methods`) for PUT, DELETE, TRACE, and WebDAV.<br>• Executive Security Health Score (0-100, A+ to F) with terminal gauge and category breakdown.<br>• Master pipeline expanded to 12 automated stages (`phantom full`).<br>• Streamlined, zero-wrap horizontal terminal ASCII banner and sleek pixel cyber banner asset.<br>• Expanded test suite to **125 passing tests**. |
 | **v1.7.0** | **Multi-Cloud Auditor & Finding Matrix** | • Multi-Cloud Storage Auditor across AWS S3, GCP Storage, and Azure Blob (`phantom cloud`).<br>• Executive & Technical Vulnerability Matrix Table with exact descriptions, real-world impact, and remediation across HTML, Markdown, Text, and Terminal.<br>• Extended master pipeline (`phantom full`) to 11 automated stages.<br>• Interactive HTML filter synchronizes both the table matrix and card views.<br>• Expanded test suite to **107 passing tests**. |
