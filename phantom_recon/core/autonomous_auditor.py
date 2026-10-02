@@ -95,10 +95,30 @@ class AutonomousAuditor:
         logger.info(f"[Stage {stage}/{self.TOTAL_STAGES}] {description}")
 
     def _add_finding(self, finding: AuditFinding) -> None:
-        # Avoid duplicate titles at the same location
+        # Avoid duplicate titles or duplicate targets across stages
         for existing in self.findings:
+            # 1. Exact match on title and location
             if existing.title == finding.title and existing.location == finding.location:
                 return
+
+            # 2. Cloud storage bucket deduplication
+            if ("cloud" in existing.category.lower() or "cloud" in finding.category.lower()) and (
+                (existing.poc_url and existing.poc_url == finding.poc_url) or
+                (existing.location and existing.location == finding.location) or
+                (finding.poc_url and existing.poc_url and (finding.poc_url in existing.poc_url or existing.poc_url in finding.poc_url))
+            ):
+                if finding.cvss_score > existing.cvss_score:
+                    existing.title = finding.title
+                    existing.severity = finding.severity
+                    existing.cvss_score = finding.cvss_score
+                    existing.description = finding.description
+                    existing.evidence = finding.evidence or existing.evidence
+                return
+
+            # 3. Duplicate title on same domain / host
+            if existing.title == finding.title:
+                return
+
         self.findings.append(finding)
 
     def _adapt_web_url_and_check_liveness(self, open_ports: dict[str, Any]) -> bool:
