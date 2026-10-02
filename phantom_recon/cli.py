@@ -29,6 +29,7 @@ from phantom_recon.utils.logger import (
     info,
     warning,
     print_results_table,
+    print_vulnerabilities_matrix,
     print_scan_summary,
     severity_badge,
 )
@@ -230,6 +231,64 @@ def api(ctx, url, timeout):
     _save_output(ctx, {"target": url, "api_endpoints": endpoints})
 
 
+# ─── Cloud Storage & Bucket Audit ──────────────────────────────
+@main.command()
+@click.option("--target", "-t", required=True, help="Target domain, URL, or organization keyword.")
+@click.option("--threads", default=20, help="Concurrency thread pool count.")
+@click.option("--timeout", default=3.5, help="Network timeout per bucket probe (seconds).")
+@click.pass_context
+def cloud(ctx, target, threads, timeout):
+    """☁️ Multi-Cloud storage auditor: AWS S3, Google Cloud, Azure Blob bucket leaks."""
+    print_banner()
+    section_header("Cloud Storage & Bucket Leakage Auditor")
+
+    from phantom_recon.core.cloud_auditor import CloudAuditor
+
+    info(f"Auditing cloud storage bucket exposure for: [bold cyan]{target}[/bold cyan]")
+    auditor = CloudAuditor(target=target, threads=threads, timeout=timeout)
+    results = auditor.run_cloud_audit()
+
+    findings = results.get("findings", [])
+    open_buckets = results.get("open_buckets", [])
+    protected_buckets = results.get("protected_buckets", [])
+
+    if findings:
+        rows = []
+        for f in findings:
+            status_text = "[bold red]OPEN (LISTABLE)[/bold red]" if f.get("is_open") else "[dim green]PROTECTED[/dim green]"
+            rows.append([
+                f.get("provider", ""),
+                f.get("bucket_name", ""),
+                status_text,
+                f.get("severity", "").upper(),
+                str(f.get("object_count", 0)) if f.get("is_open") else "N/A",
+                f.get("url", ""),
+            ])
+
+        print_results_table(
+            f"Cloud Storage Findings — {target}",
+            [
+                ("Provider", "bold cyan"),
+                ("Bucket / Account", "white"),
+                ("Access Status", "yellow"),
+                ("Severity", "magenta"),
+                ("Objects", "green"),
+                ("URL", "blue"),
+            ],
+            rows,
+        )
+
+        if open_buckets:
+            error(f"🚨 CRITICAL ALERT: Found {len(open_buckets)} PUBLICLY LISTABLE cloud bucket(s)!")
+            for ob in open_buckets:
+                console.print(f"   [bold red]•[/bold red] {ob.get('provider')}: [underline]{ob.get('url')}[/underline] ({ob.get('object_count')} files exposed)")
+        else:
+            success(f"No publicly listable cloud buckets found ({len(protected_buckets)} protected buckets exist).")
+    else:
+        info("No cloud storage buckets or Azure containers discovered for this target.")
+
+    _save_output(ctx, results)
+
 
 # ─── Web Recon ──────────────────────────────────────────────────
 @main.command()
@@ -408,19 +467,9 @@ def vuln(ctx, url, checks, deep, output):
 
     # Display
     if results:
-        rows = []
-        for v in results:
-            poc_link = v.get("poc_url") or url
-            rows.append([
-                severity_badge(v["severity"]),
-                v["title"],
-                f"[cyan]{v.get('location', 'Global')}[/cyan]",
-                f"[link={poc_link}][underline blue]{poc_link[:45]}...[/underline blue][/link]" if len(poc_link) > 45 else f"[link={poc_link}][underline blue]{poc_link}[/underline blue][/link]",
-            ])
-        print_results_table(
-            f"Vulnerability Assessment — {url}",
-            [("Severity", ""), ("Title", "bold"), ("Location", "cyan"), ("Direct Link (Clickable)", "")],
-            rows,
+        print_vulnerabilities_matrix(
+            results,
+            f"Vulnerability Assessment & Explanations Matrix — {url}",
         )
 
         # Print detailed breakdown for direct access & verification
@@ -669,7 +718,7 @@ def full(ctx, target, output):
 
     # 1. WHOIS
     try:
-        section_header("Step 1/8: WHOIS Lookup")
+        section_header("Step 1/11: WHOIS Lookup")
         from phantom_recon.core.whois_lookup import WhoisLookup
         whois_data = WhoisLookup(target=target).lookup()
         all_results["whois"] = whois_data
@@ -679,7 +728,7 @@ def full(ctx, target, output):
 
     # 2. DNS
     try:
-        section_header("Step 2/8: DNS Enumeration")
+        section_header("Step 2/11: DNS Enumeration")
         from phantom_recon.core.dns_enum import DNSEnumerator
         dns_data = DNSEnumerator(domain=target).enumerate_all()
         all_results["dns"] = dns_data
@@ -689,7 +738,7 @@ def full(ctx, target, output):
 
     # 3. Subdomain Discovery
     try:
-        section_header("Step 3/10: Subdomain Discovery")
+        section_header("Step 3/11: Subdomain Discovery")
         from phantom_recon.core.subdomain import SubdomainFinder
         subs = SubdomainFinder(domain=target, threads=20).find_all()
         all_results["subdomains"] = subs
@@ -699,7 +748,7 @@ def full(ctx, target, output):
 
     # 4. WAF & Origin IP Audit
     try:
-        section_header("Step 4/10: WAF & Origin IP Leakage Audit")
+        section_header("Step 4/11: WAF & Origin IP Leakage Audit")
         from phantom_recon.core.waf_detector import WAFDetector
         waf_data = WAFDetector(target=target).run_full_waf_analysis()
         all_results["waf"] = waf_data
@@ -712,9 +761,24 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"WAF audit failed: {e}")
 
-    # 5. Port Scan
+    # 5. Cloud Storage Audit
     try:
-        section_header("Step 5/10: Port Scanning")
+        section_header("Step 5/11: Cloud Storage & Bucket Leakage Audit")
+        from phantom_recon.core.cloud_auditor import CloudAuditor
+        cloud_results = CloudAuditor(target=target, threads=20).run_cloud_audit()
+        all_results["cloud_storage"] = cloud_results
+        open_b = cloud_results.get("open_buckets_count", 0)
+        prot_b = cloud_results.get("protected_buckets_count", 0)
+        if open_b > 0:
+            error(f"🚨 Found {open_b} PUBLICLY LISTABLE cloud storage buckets!")
+        else:
+            success(f"Cloud audit complete: 0 open buckets ({prot_b} protected)")
+    except Exception as e:
+        warning(f"Cloud storage audit failed: {e}")
+
+    # 6. Port Scan
+    try:
+        section_header("Step 6/11: Port Scanning")
         from phantom_recon.core.scanner import PortScanner
         scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
         all_results["ports"] = scan_results.get("ports", {})
@@ -722,9 +786,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Port scan failed: {e}")
 
-    # 6. Web Reconnaissance
+    # 7. Web Reconnaissance
     try:
-        section_header("Step 6/10: Web Application Reconnaissance")
+        section_header("Step 7/11: Web Application Reconnaissance")
         from phantom_recon.core.web_recon import WebRecon
         url = f"https://{target}" if not target.startswith("http") else target
         web_results = WebRecon(url=url).run_full_recon()
@@ -735,9 +799,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Web reconnaissance failed: {e}")
 
-    # 7. API Discovery
+    # 8. API Discovery
     try:
-        section_header("Step 7/10: API & Architecture Discovery")
+        section_header("Step 8/11: API & Architecture Discovery")
         from phantom_recon.core.api_scanner import APIScanner
         url = f"https://{target}" if not target.startswith("http") else target
         api_results = APIScanner(url=url).scan_endpoints()
@@ -746,9 +810,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"API discovery failed: {e}")
 
-    # 8. Header Analysis
+    # 9. Header Analysis
     try:
-        section_header("Step 8/10: Header Analysis")
+        section_header("Step 9/11: Header Analysis")
         from phantom_recon.core.header_analyzer import HeaderAnalyzer
         url = f"https://{target}" if not target.startswith("http") else target
         header_data = HeaderAnalyzer(url=url).analyze()
@@ -757,9 +821,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Header analysis failed: {e}")
 
-    # 9. SSL Analysis
+    # 10. SSL Analysis
     try:
-        section_header("Step 9/10: SSL/TLS Analysis")
+        section_header("Step 10/11: SSL/TLS Analysis")
         from phantom_recon.core.ssl_analyzer import SSLAnalyzer
         ssl_data = SSLAnalyzer(host=target).analyze()
         all_results["ssl"] = ssl_data
@@ -767,14 +831,27 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"SSL analysis failed: {e}")
 
-    # 10. Vulnerability Scan
+    # 11. Vulnerability Scan
     try:
-        section_header("Step 10/10: Vulnerability Scan")
+        section_header("Step 11/11: Vulnerability Scan")
         from phantom_recon.core.vuln_scanner import VulnerabilityScanner
         url = f"https://{target}" if not target.startswith("http") else target
         vuln_data = VulnerabilityScanner(url=url).scan_all()
         all_results["vulnerabilities"] = vuln_data
         success(f"Found {len(vuln_data)} vulnerabilities")
+        if vuln_data:
+            print_vulnerabilities_matrix(vuln_data, f"Vulnerability Assessment & Explanations Matrix — {target}")
+            console.print("[bold yellow]📍 DETAILED REPRODUCTION PROOF-OF-CONCEPT & DIRECT ACCESS:[/bold yellow]\n")
+            for idx, v in enumerate(vuln_data, 1):
+                poc_link = v.get("poc_url") or url
+                curl_cmd = v.get("reproduce_curl") or f"curl -i -k '{poc_link}'"
+                console.print(f"  [bold white]#{idx} {v['title']}[/bold white] ({severity_badge(v['severity'])})")
+                console.print(f"     [bold cyan]📍 Location:[/bold cyan]    {v.get('location', 'Global Application')}")
+                console.print(f"     [bold green]🔗 Direct Link:[/bold green]  [link={poc_link}][bold underline cyan]{poc_link}[/bold underline cyan][/link]")
+                console.print(f"     [bold magenta]💻 PoC cURL:[/bold magenta]    [dim]{curl_cmd}[/dim]")
+                if v.get("evidence"):
+                    console.print(f"     [dim]📋 Evidence:    {v.get('evidence')[:120]}...[/dim]")
+                console.print(f"     [bold green]💡 Fix:[/bold green]         {v.get('remediation', 'N/A')}\n")
     except Exception as e:
         warning(f"Vulnerability scan failed: {e}")
 

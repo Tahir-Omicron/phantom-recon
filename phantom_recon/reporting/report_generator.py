@@ -204,19 +204,21 @@ class ReportGenerator:
         if vulns:
             md_lines.append("---")
             md_lines.append("")
-            md_lines.append("## 🛡️ Vulnerability Findings Overview")
+            md_lines.append("## 🛡️ Vulnerability Findings Overview & Technical Matrix")
             md_lines.append("")
-            md_lines.append("| # | Severity | Title | Location | CVSS |")
-            md_lines.append("| :-: | :--- | :--- | :--- | :-: |")
+            md_lines.append("| # | Severity | Vulnerability Name | Location | CVSS | What It Is (Description & Impact) | Remediation Guidance |")
+            md_lines.append("| :-: | :--- | :--- | :--- | :-: | :--- | :--- |")
             for idx, v in enumerate(vulns, 1):
                 if isinstance(v, dict):
                     sev = v.get("severity", "info").upper()
                     title = v.get("title", "Finding")
                     loc = v.get("location", "Global")
                     cvss = v.get("cvss_score", "N/A")
+                    desc = v.get("description", "").replace("\n", " ").replace("|", "\\|")
+                    remedy = v.get("remediation", "").replace("\n", " ").replace("|", "\\|")
                     poc_url = v.get("poc_url", "")
                     link_title = f"[{title}]({poc_url})" if poc_url else title
-                    md_lines.append(f"| {idx} | **{sev}** | {link_title} | `{loc}` | {cvss} |")
+                    md_lines.append(f"| {idx} | **{sev}** | {link_title} | `{loc}` | {cvss} | {desc} | {remedy} |")
             md_lines.append("")
 
             md_lines.append("---")
@@ -289,6 +291,28 @@ class ReportGenerator:
                 for c in unprot:
                     md_lines.append(f"| `{c.get('ip')}` | `{c.get('hostname')}` | `{c.get('source')}` | {c.get('evidence')} |")
             md_lines.append("")
+
+        # Cloud Storage Findings
+        cloud_data = self.scan_data.get("cloud_storage", {})
+        if cloud_data and isinstance(cloud_data, dict):
+            cloud_findings = cloud_data.get("findings", [])
+            if cloud_findings:
+                md_lines.append("## ☁️ Cloud Storage & Bucket Exposure Audit")
+                md_lines.append("")
+                md_lines.append(f"- **Tested Permutations:** `{cloud_data.get('total_tested', 0)}`")
+                md_lines.append(f"- **Publicly Listable Buckets:** `{cloud_data.get('open_buckets_count', 0)}`")
+                md_lines.append(f"- **Protected Buckets Identified:** `{cloud_data.get('protected_buckets_count', 0)}`")
+                md_lines.append("")
+                md_lines.append("| Provider | Bucket / Container | Status | Severity | Direct URL | Evidence |")
+                md_lines.append("| :--- | :--- | :---: | :---: | :--- | :--- |")
+                for f in cloud_findings:
+                    if isinstance(f, dict):
+                        is_open = f.get("is_open", False)
+                        st = "🚨 **OPEN**" if is_open else "🔒 Protected"
+                        sev = f.get("severity", "INFO")
+                        url_link = f"[{f.get('url')}]({f.get('url')})"
+                        md_lines.append(f"| `{f.get('provider')}` | `{f.get('bucket_name')}` | {st} | `{sev}` | {url_link} | {f.get('evidence', '')[:60]} |")
+                md_lines.append("")
 
         # Port scan
         ports = self.scan_data.get("ports", {})
@@ -394,8 +418,21 @@ class ReportGenerator:
         # Vulnerabilities
         vulns = self.scan_data.get("vulnerabilities", [])
         if vulns:
-            lines.append("IDENTIFIED VULNERABILITIES & DIRECT JUMP LINKS")
-            lines.append("-" * 70)
+            lines.append("VULNERABILITY FINDINGS MATRIX")
+            lines.append("=" * 80)
+            lines.append(f"{'#':<4} {'SEVERITY':<10} {'VULNERABILITY':<28} {'LOCATION':<22} {'CVSS':<6}")
+            lines.append("-" * 80)
+            for i, vuln in enumerate(vulns, 1):
+                if isinstance(vuln, dict):
+                    severity = vuln.get("severity", "info").upper()
+                    title = vuln.get("title", "Unknown")[:26]
+                    loc = vuln.get("location", "Global")[:20]
+                    cvss = str(vuln.get("cvss_score", "N/A"))
+                    lines.append(f"{i:<4} {severity:<10} {title:<28} {loc:<22} {cvss:<6}")
+            lines.append("=" * 80)
+            lines.append("")
+            lines.append("DETAILED VULNERABILITY DOSSIERS & REMEDIATION")
+            lines.append("-" * 80)
             for i, vuln in enumerate(vulns, 1):
                 if isinstance(vuln, dict):
                     severity = vuln.get("severity", "info").upper()
@@ -406,19 +443,20 @@ class ReportGenerator:
                     evidence = vuln.get("evidence", "")
                     desc = vuln.get("description", "")
                     remedy = vuln.get("remediation", "")
+                    cvss = vuln.get("cvss_score", "N/A")
 
-                    lines.append(f"  [{severity}] #{i} {title}")
-                    lines.append(f"    Location:       {location}")
+                    lines.append(f"[#{i}] {title} — [{severity}] (CVSS: {cvss})")
+                    lines.append(f"  • Location:           {location}")
+                    lines.append(f"  • What It Is & Risk:  {desc}")
+                    lines.append(f"  • Remediation:        {remedy}")
                     if poc_url:
-                        lines.append(f"    Direct URL:     {poc_url}")
+                        lines.append(f"  • Direct Jump Link:   {poc_url}")
                     if reproduce_curl:
-                        lines.append(f"    PoC cURL:       {reproduce_curl}")
-                    lines.append(f"    Description:    {desc}")
+                        lines.append(f"  • PoC cURL Command:   {reproduce_curl}")
                     if evidence:
-                        lines.append(f"    Evidence:       {evidence}")
-                    if remedy:
-                        lines.append(f"    Remediation:    {remedy}")
-                    lines.append("")
+                        lines.append(f"  • Verified Evidence:  {evidence}")
+                    lines.append("-" * 80)
+            lines.append("")
 
         # DNS records
         if "dns" in self.scan_data:
@@ -471,6 +509,21 @@ class ReportGenerator:
             for ep in self.scan_data.get("api_endpoints", []):
                 if isinstance(ep, dict):
                     lines.append(f"  [{ep.get('status_code', 200)}] {ep.get('path', '')} ({ep.get('type', '')})")
+            lines.append("")
+
+        # Cloud Storage Findings
+        if "cloud_storage" in self.scan_data:
+            lines.append("CLOUD STORAGE & BUCKET AUDIT")
+            lines.append("-" * 40)
+            cloud_data = self.scan_data["cloud_storage"]
+            if isinstance(cloud_data, dict):
+                lines.append(f"  Tested Permutations: {cloud_data.get('total_tested', 0)}")
+                lines.append(f"  Open Buckets:        {cloud_data.get('open_buckets_count', 0)}")
+                lines.append(f"  Protected Buckets:   {cloud_data.get('protected_buckets_count', 0)}")
+                for f in cloud_data.get("findings", []):
+                    if isinstance(f, dict):
+                        st = "OPEN [!]" if f.get("is_open") else "PROTECTED"
+                        lines.append(f"    - [{f.get('provider')}] {f.get('bucket_name')}: {st} -> {f.get('url')}")
             lines.append("")
 
         # SSL

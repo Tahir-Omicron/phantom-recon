@@ -672,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.6.0 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.7.0 (Zero False Positive)</strong></span>
                 </div>
             </div>
 
@@ -736,7 +736,60 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Vulnerability Findings List -->
+        <!-- Vulnerability Findings & Explanation Matrix Table -->
+        <section class="content-card" id="vulnMatrixSection">
+            <div class="content-title">
+                <span>🛡️ Vulnerability Findings & Explanations Matrix</span>
+                <span class="badge" style="background: rgba(255, 51, 102, 0.15); border: 1px solid var(--neon-red); color: var(--neon-red);">{{ data.get('vulnerabilities', [])|length }} Confirmed Findings</span>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="matrixTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 45px; text-align: center;">#</th>
+                            <th style="width: 110px;">Severity</th>
+                            <th style="width: 220px;">Vulnerability</th>
+                            <th style="width: 180px;">Affected Location</th>
+                            <th>What It Is & Real-World Impact</th>
+                            <th style="width: 260px;">Remediation Guidance</th>
+                            <th style="width: 90px; text-align: center;">PoC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vuln in data.get('vulnerabilities', []) %}
+                        <tr class="matrix-row" data-severity="{{ vuln.get('severity', 'info')|lower }}">
+                            <td style="text-align: center; font-weight: 700; color: var(--text-dim);">{{ loop.index }}</td>
+                            <td>
+                                <span class="badge badge-{{ vuln.get('severity', 'info')|lower }}">{{ vuln.get('severity', 'info')|upper }}</span>
+                            </td>
+                            <td>
+                                <strong style="color: var(--text-main);">{{ vuln.get('title', 'Finding') }}</strong>
+                                {% if vuln.get('cve') %}
+                                <div style="font-size: 0.78em; color: #82b1ff; margin-top: 3px;">{{ vuln.get('cve') }}</div>
+                                {% endif %}
+                            </td>
+                            <td><code style="color: var(--neon-cyan); font-size: 0.85em;">{{ vuln.get('location', 'Global') }}</code></td>
+                            <td style="line-height: 1.5; font-size: 0.9em; color: var(--text-sub);">
+                                {{ vuln.get('description', 'N/A') }}
+                            </td>
+                            <td style="line-height: 1.5; font-size: 0.88em; color: #86efac;">
+                                {{ vuln.get('remediation', 'N/A') }}
+                            </td>
+                            <td style="text-align: center;">
+                                {% if vuln.get('poc_url') %}
+                                <a href="{{ vuln.get('poc_url') }}" target="_blank" rel="noopener noreferrer" class="btn-jump" style="padding: 4px 10px; font-size: 0.78em; display: inline-block;">🔗 View</a>
+                                {% else %}
+                                <span style="color: var(--text-dim); font-size: 0.8em;">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Vulnerability Findings List & Technical Dossiers -->
         <section class="vuln-list" id="vulnList">
             {% for vuln in data.get('vulnerabilities', []) %}
             <article class="vuln-card {{ vuln.get('severity', 'info')|lower }}" data-severity="{{ vuln.get('severity', 'info')|lower }}">
@@ -776,7 +829,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                         </a>
                         {% endif %}
                         {% if vuln.get('reproduce_curl') %}
-                        <button class="btn-copy" onclick="copyText(`{{ vuln.get('reproduce_curl')|replace('`', '\\`') }}`)">
+                        <button class="btn-copy" data-curl="{{ vuln.get('reproduce_curl') }}" onclick="copyText(this.getAttribute('data-curl'))">
                             📋 Copy PoC cURL
                         </button>
                         {% endif %}
@@ -884,6 +937,46 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         </section>
         {% endif %}
 
+        <!-- Cloud Storage & Bucket Exposure Section -->
+        {% if data.get('cloud_storage') and data.get('cloud_storage', {}).get('findings') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>☁️ Multi-Cloud Storage & Bucket Leakage Audit</span>
+                <span class="badge" style="background: rgba(0, 230, 118, 0.15); border: 1px solid var(--neon-green); color: var(--neon-green);">{{ data.get('cloud_storage', {}).get('open_buckets_count', 0) }} open / {{ data.get('cloud_storage', {}).get('total_discovered', 0) }} discovered</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cloud Provider</th>
+                        <th>Bucket / Account</th>
+                        <th>Access Status</th>
+                        <th>Severity</th>
+                        <th>Direct URL</th>
+                        <th>Evidence / Proof</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in data.get('cloud_storage', {}).get('findings', []) %}
+                    <tr>
+                        <td><code style="color: var(--neon-cyan); font-weight: 700;">{{ f.get('provider') }}</code></td>
+                        <td><strong>{{ f.get('bucket_name') }}</strong></td>
+                        <td>
+                            {% if f.get('is_open') %}
+                            <span class="badge" style="background: rgba(255, 23, 68, 0.2); color: var(--neon-red); border: 1px solid var(--neon-red);">🚨 OPEN (LISTABLE)</span>
+                            {% else %}
+                            <span class="badge" style="background: rgba(0, 230, 118, 0.15); color: var(--neon-green); border: 1px solid var(--neon-green);">🔒 Protected</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge badge-{{ f.get('severity', 'info')|lower }}">{{ f.get('severity') }}</span></td>
+                        <td><a href="{{ f.get('url') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan); font-size: 0.9em;">{{ f.get('url') }}</a></td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ f.get('evidence', '')[:80] }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
         <!-- Open Ports Section -->
         {% if data.get('ports') %}
         <section class="content-card">
@@ -981,19 +1074,22 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         function filterFindings() {
             const query = (document.getElementById('searchInput')?.value || '').toLowerCase();
             const cards = document.querySelectorAll('.vuln-card');
+            const rows = document.querySelectorAll('.matrix-row');
 
             cards.forEach(card => {
                 const sev = card.getAttribute('data-severity');
                 const text = card.innerText.toLowerCase();
-
                 const matchesFilter = (currentFilter === 'all' || sev === currentFilter);
                 const matchesSearch = query === '' || text.includes(query);
+                card.style.display = (matchesFilter && matchesSearch) ? 'block' : 'none';
+            });
 
-                if (matchesFilter && matchesSearch) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
+            rows.forEach(row => {
+                const sev = row.getAttribute('data-severity');
+                const text = row.innerText.toLowerCase();
+                const matchesFilter = (currentFilter === 'all' || sev === currentFilter);
+                const matchesSearch = query === '' || text.includes(query);
+                row.style.display = (matchesFilter && matchesSearch) ? '' : 'none';
             });
         }
 

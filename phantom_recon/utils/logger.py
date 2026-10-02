@@ -12,6 +12,7 @@ import sys
 from datetime import datetime
 from typing import Any, Optional
 
+from rich import box
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
@@ -86,7 +87,7 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 1.6.0 | Author: Tahir | License: MIT[/dim]\n"
+            "[dim]📌 Version 1.7.0 | Author: Tahir | License: MIT[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing only[/dim yellow]",
             border_style="red",
             padding=(1, 2),
@@ -168,6 +169,12 @@ def print_command_palette() -> None:
     )
     table.add_row(
         "🛡️ Vuln & Defense",
+        "cloud",
+        "phantom cloud -t site.com",
+        "Multi-cloud storage auditor: AWS S3, GCP, Azure Blob bucket leaks."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
         "api",
         "phantom api -u https://site.com",
         "API discovery: Swagger/OpenAPI schemas, GraphQL & Spring Actuators."
@@ -198,7 +205,7 @@ def print_command_palette() -> None:
         "📊 Master & Report",
         "full",
         "phantom full -t site.com -o report.html",
-        "Master 10-step full reconnaissance pipeline + interactive report."
+        "Master 11-step full reconnaissance pipeline + interactive report."
     )
     table.add_row(
         "📊 Master & Report",
@@ -220,9 +227,10 @@ def print_command_palette() -> None:
         Panel(
             "[bold white]🚀 Quick-Start Command Cheat Sheet:[/bold white]\n"
             "  [dim]•[/dim] [cyan]phantom vuln -u https://example.com -o report.html[/cyan]  → [dim]Full web vulnerability assessment + HTML dashboard[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom cloud -t example.com[/cyan]                        → [dim]Audit AWS S3, GCP & Azure for publicly exposed buckets[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom waf -t example.com[/cyan]                         → [dim]Detect WAF front & audit for leaked origin server IPs[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom api -u https://example.com[/cyan]                         → [dim]Discover OpenAPI/Swagger schemas & GraphQL routes[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                        → [dim]End-to-end 10-stage autonomous penetration test recon[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                        → [dim]End-to-end 11-stage autonomous penetration test recon[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom scan -t 192.168.1.1 -p top100[/cyan]              → [dim]Scan top 100 ports with banner grabbing[/dim]",
             title="[bold yellow]💡 Pro Tips[/bold yellow]",
             border_style="yellow",
@@ -295,6 +303,60 @@ def print_results_table(
         table.add_column(col_name, style=col_style)
     for row in rows:
         table.add_row(*row)
+    console.print(table)
+    console.print()
+
+
+def print_vulnerabilities_matrix(
+    vulns: list[dict],
+    title: str = "Vulnerability Assessment & Explanations Matrix",
+) -> None:
+    """
+    Render an executive and technical vulnerability matrix table.
+    Presents severity, title, location, technical explanation of what the vulnerability is,
+    and actionable remediation guidance in a structured, readable table.
+    """
+    if not vulns:
+        return
+
+    table = Table(
+        title=f"🛡️  {title}",
+        title_style="bold red",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+        show_lines=True,
+        header_style="bold cyan",
+    )
+    table.add_column("#", justify="center", style="bold dim", width=4)
+    table.add_column("Severity", justify="center", width=12)
+    table.add_column("Vulnerability Name", style="bold white", width=26)
+    table.add_column("Affected Location", style="cyan", width=22)
+    table.add_column("Description & Impact (Nədir & Təsiri)", style="white", min_width=32)
+    table.add_column("Remediation / Fix Guidance", style="green", min_width=26)
+
+    for idx, v in enumerate(vulns, 1):
+        if not isinstance(v, dict):
+            continue
+        sev = v.get("severity", "info")
+        badge = severity_badge(sev)
+        title_text = v.get("title", "Finding")
+        if v.get("cve"):
+            title_text += f"\n[dim yellow]({v['cve']})[/dim yellow]"
+        if v.get("cvss_score"):
+            badge += f"\n[dim]CVSS {v['cvss_score']}[/dim]"
+        loc = v.get("location", "Global Target")
+        desc = v.get("description", "No description provided.")
+        remedy = v.get("remediation", "Review application security policy.")
+
+        table.add_row(
+            str(idx),
+            badge,
+            title_text,
+            loc,
+            desc,
+            remedy,
+        )
+
     console.print(table)
     console.print()
 

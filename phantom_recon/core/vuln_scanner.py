@@ -1259,6 +1259,53 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_cloud_storage(self) -> list[Vulnerability]:
+        """
+        Audit for publicly exposed cloud storage buckets (AWS S3, GCP, Azure Blob)
+        associated with the target organization.
+        """
+        logger.info(f"Auditing target for exposed cloud storage buckets...")
+        vulns = []
+        try:
+            from phantom_recon.core.cloud_auditor import CloudAuditor
+            auditor = CloudAuditor(target=self.url, timeout=self.timeout)
+            results = auditor.run_cloud_audit()
+
+            open_buckets = results.get("open_buckets") or [
+                f for f in results.get("findings", []) if f.get("is_open")
+            ]
+            for b in open_buckets:
+                provider = b.get("provider", "Cloud Storage")
+                name = b.get("bucket_name", "")
+                url = b.get("url", "")
+                count = b.get("object_count", 0)
+                evidence = b.get("evidence", "")
+
+                vuln = Vulnerability(
+                    title=f"Cloud Storage Leakage: Publicly Listable {provider} Bucket '{name}'",
+                    severity="critical",
+                    cvss_score=9.1,
+                    description=(
+                        f"The {provider} storage bucket '{name}' is publicly accessible and listable without authentication. "
+                        f"Anonymous users can list and download sensitive files ({count} objects detected)."
+                    ),
+                    location=f"Cloud Storage: {url}",
+                    url=self.url,
+                    poc_url=url,
+                    reproduce_curl=f"curl -i -s '{url}'",
+                    evidence=evidence,
+                    remediation=b.get("remediation", "Disable public access and enforce strict IAM bucket policies."),
+                    category="cloud_misconfiguration",
+                    confidence="CONFIRMED",
+                )
+                vulns.append(vuln)
+                self._add_vuln(vuln)
+
+        except Exception as e:
+            logger.debug(f"Cloud storage audit error: {e}")
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -1272,6 +1319,7 @@ class VulnerabilityScanner:
         self.profile_404_baseline()
         self.check_waf_and_origin_leakage()
         self.check_api_and_docs()
+        self.check_cloud_storage()
         self.check_security_headers()
         self.check_cookie_security()
         self.check_cors()
