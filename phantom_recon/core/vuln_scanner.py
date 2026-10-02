@@ -1123,6 +1123,87 @@ class VulnerabilityScanner:
 
         return vulns
 
+    def check_waf_and_origin_leakage(self) -> list[Vulnerability]:
+        """
+        Audit for WAF/CDN edge proxy presence and unproxied backend origin IP leakage.
+        """
+        logger.info(f"Auditing WAF presence and backend origin IP leakage on '{self.url}'...")
+        vulns = []
+        try:
+            from phantom_recon.core.waf_detector import WAFDetector
+            detector = WAFDetector(target=self.url, timeout=self.timeout)
+            waf_results = detector.run_full_waf_analysis()
+
+            has_waf = waf_results.get("has_waf", False)
+            waf_name = waf_results.get("waf_name", "Unknown")
+            resolved_ips = waf_results.get("resolved_ips", [])
+            origin_leak = waf_results.get("origin_leakage", {})
+            unprotected_candidates = origin_leak.get("unprotected_origin_candidates", [])
+
+            if has_waf:
+                # If WAF detected and unprotected origin server candidates exist
+                if unprotected_candidates:
+                    leak_details = "\n".join(
+                        f"• {c['source']} → IP: {c['ip']} ({c.get('evidence', '')})"
+                        for c in unprotected_candidates[:5]
+                    )
+                    vuln = Vulnerability(
+                        title=f"WAF Bypass Exposure: Potential Origin Server IP Leaked for '{detector.domain}'",
+                        severity="high",
+                        cvss_score=7.5,
+                        description=(
+                            f"The domain '{detector.domain}' is fronted by {waf_name} Web Application Firewall, "
+                            "but exposed DNS/subdomain records reveal direct, unproxied backend origin IP addresses. "
+                            "Adversaries can bypass all cloud WAF inspection, rate limiting, and DDoS mitigation "
+                            "by directing traffic directly to these unprotected origin IPs."
+                        ),
+                        location=f"DNS / Origin Infrastructure: {detector.domain}",
+                        url=self.url,
+                        poc_url=self.url,
+                        reproduce_curl=f"curl -i -k -H 'Host: {detector.domain}' 'https://{unprotected_candidates[0]['ip']}/'",
+                        evidence=(
+                            f"Target is fronted by: {waf_name}\n"
+                            f"Resolved Edge IPs: {', '.join(resolved_ips)}\n"
+                            f"Exposed Origin Candidates:\n{leak_details}"
+                        ),
+                        remediation=(
+                            f"1. Configure origin server firewall/security groups to reject all incoming HTTP/HTTPS connections "
+                            f"except from authorized {waf_name} IP ranges.\n"
+                            "2. Proxify or isolate mail (MX), FTP, and internal subdomains onto separate non-application IP ranges.\n"
+                            "3. Do not publish backend origin server IP addresses in SPF TXT records."
+                        ),
+                        category="infrastructure_exposure",
+                        confidence="CONFIRMED",
+                    )
+                    vulns.append(vuln)
+                    self._add_vuln(vuln)
+                else:
+                    # Target is behind WAF and no direct origin leak found
+                    vuln = Vulnerability(
+                        title=f"Cloud Infrastructure: Target Fronted by {waf_name} CDN/WAF",
+                        severity="info",
+                        cvss_score=0.0,
+                        description=(
+                            f"The target host '{detector.domain}' is fronted by {waf_name} edge proxy infrastructure. "
+                            "Direct port scanning and perimeter probing will target edge Anycast nodes rather than internal origin hosts."
+                        ),
+                        location=f"Network Edge: {waf_name}",
+                        url=self.url,
+                        poc_url=self.url,
+                        reproduce_curl=f"curl -I '{self.url}'",
+                        evidence=f"Edge Provider: {waf_name}. Indicators: {'; '.join(waf_results.get('indicators', [])[:3])}",
+                        remediation="Ensure origin server IP is strictly firewalled to only accept traffic from the CDN/WAF provider.",
+                        category="infrastructure_info",
+                        confidence="CONFIRMED",
+                    )
+                    vulns.append(vuln)
+                    self._add_vuln(vuln)
+
+        except Exception as e:
+            logger.debug(f"WAF and origin leakage check error: {e}")
+
+        return vulns
+
     def scan_all(self) -> list[dict[str, Any]]:
         """
         Run the complete ultra-precision vulnerability scan suite.
@@ -1134,6 +1215,7 @@ class VulnerabilityScanner:
 
         # Run all precision detection modules
         self.profile_404_baseline()
+        self.check_waf_and_origin_leakage()
         self.check_security_headers()
         self.check_cookie_security()
         self.check_cors()

@@ -6,7 +6,7 @@
 ╚══════════════════════════════════════════════════════════════╝
 """
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 __author__ = "Tahir"
 __license__ = "MIT"
 
@@ -20,6 +20,7 @@ from phantom_recon.core.brute import BruteForcer
 from phantom_recon.core.whois_lookup import WhoisLookup
 from phantom_recon.core.header_analyzer import HeaderAnalyzer
 from phantom_recon.core.ssl_analyzer import SSLAnalyzer
+from phantom_recon.core.waf_detector import WAFDetector
 from phantom_recon.reporting.report_generator import ReportGenerator
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "WhoisLookup",
     "HeaderAnalyzer",
     "SSLAnalyzer",
+    "WAFDetector",
     "ReportGenerator",
 ]

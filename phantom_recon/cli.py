@@ -95,10 +95,86 @@ def scan(ctx, target, ports, scan_type, threads, timeout):
             rows,
         )
 
+    if results.get("is_waf_proxy"):
+        warning(
+            f"Target IP ({results['ip']}) belongs to {results.get('waf_provider', 'Cloud')} WAF/CDN proxy network.\n"
+            f"Port scan results reflect {results.get('waf_provider')} Anycast edge infrastructure, not the origin server.\n"
+            f"Run 'phantom waf -t {target}' to audit for unproxied backend origin IP addresses."
+        )
+
     print_scan_summary(target, datetime.fromisoformat(results["start_time"]),
                        datetime.fromisoformat(results["end_time"]), results["open_ports_count"])
 
     _save_output(ctx, results)
+
+
+# ─── WAF & Origin IP Audit ──────────────────────────────────────
+@main.command()
+@click.option("--target", "-t", required=True, help="Target domain, IP, or URL.")
+@click.option("--timeout", default=6.0, help="Request timeout (seconds).")
+@click.pass_context
+def waf(ctx, target, timeout):
+    """🛡️ WAF & CDN detector with unproxied origin IP leakage audit."""
+    print_banner()
+    section_header("WAF / CDN & Origin IP Exposure Audit")
+
+    from phantom_recon.core.waf_detector import WAFDetector
+
+    detector = WAFDetector(target=target, timeout=timeout)
+    results = detector.run_full_waf_analysis()
+
+    # Display WAF Status Table
+    has_waf = results.get("has_waf", False)
+    waf_name = results.get("waf_name", "None")
+    resolved_ips = results.get("resolved_ips", [])
+
+    status_color = "red" if has_waf else "green"
+    waf_status_str = f"[{status_color}]{'PROTECTED' if has_waf else 'DIRECT / NO WAF'}[/{status_color}]"
+
+    rows = [
+        ["Target", target],
+        ["WAF / CDN Status", waf_status_str],
+        ["Identified Provider", f"[bold cyan]{waf_name}[/bold cyan]"],
+        ["Resolved Edge IPs", ", ".join(resolved_ips) if resolved_ips else "None"],
+    ]
+
+    print_results_table(
+        f"WAF Detection Overview — {target}",
+        [("Attribute", "bold"), ("Value", "")],
+        rows,
+    )
+
+    if results.get("warning"):
+        warning(results["warning"])
+
+    if results.get("indicators"):
+        console.print("\n[bold]Fingerprint Evidence:[/bold]")
+        for ind in results["indicators"]:
+            console.print(f"  [cyan]•[/cyan] {ind}")
+
+    origin_info = results.get("origin_leakage", {})
+    unprotected = origin_info.get("unprotected_origin_candidates", [])
+
+    if unprotected:
+        console.print("\n[bold red]🚨 POTENTIAL UNPROXIED ORIGIN IP LEAKAGE (WAF BYPASS RISK):[/bold red]")
+        candidate_rows = []
+        for c in unprotected:
+            candidate_rows.append([
+                c["ip"],
+                c["hostname"],
+                c["source"],
+                c["evidence"],
+            ])
+        print_results_table(
+            "Unproxied Origin Candidates",
+            [("IP Address", "bold red"), ("Hostname", "cyan"), ("Leak Source", "yellow"), ("Details", "dim")],
+            candidate_rows,
+        )
+    elif has_waf:
+        success("No direct backend origin IP leaks detected in common DNS/subdomain records.")
+
+    _save_output(ctx, results)
+
 
 
 # ─── Web Recon ──────────────────────────────────────────────────
@@ -559,7 +635,7 @@ def full(ctx, target, output):
 
     # 3. Subdomain Discovery
     try:
-        section_header("Step 3/8: Subdomain Discovery")
+        section_header("Step 3/9: Subdomain Discovery")
         from phantom_recon.core.subdomain import SubdomainFinder
         subs = SubdomainFinder(domain=target, threads=20).find_all()
         all_results["subdomains"] = subs
@@ -567,9 +643,24 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Subdomain discovery failed: {e}")
 
-    # 4. Port Scan
+    # 4. WAF & Origin IP Audit
     try:
-        section_header("Step 4/8: Port Scanning")
+        section_header("Step 4/9: WAF & Origin IP Leakage Audit")
+        from phantom_recon.core.waf_detector import WAFDetector
+        waf_data = WAFDetector(target=target).run_full_waf_analysis()
+        all_results["waf"] = waf_data
+        if waf_data.get("has_waf"):
+            warning(f"Target is fronted by {waf_data.get('waf_name')} CDN/WAF!")
+            if waf_data.get("origin_leakage", {}).get("leakage_detected"):
+                error(f"🚨 Potential unproxied origin server IP leakage detected!")
+        else:
+            success("No cloud WAF edge proxy detected (direct host)")
+    except Exception as e:
+        warning(f"WAF audit failed: {e}")
+
+    # 5. Port Scan
+    try:
+        section_header("Step 5/9: Port Scanning")
         from phantom_recon.core.scanner import PortScanner
         scan_results = PortScanner(target=target, ports="1-1000", threads=50).scan()
         all_results["ports"] = scan_results.get("ports", {})
@@ -577,9 +668,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Port scan failed: {e}")
 
-    # 5. Web Reconnaissance
+    # 6. Web Reconnaissance
     try:
-        section_header("Step 5/8: Web Application Reconnaissance")
+        section_header("Step 6/9: Web Application Reconnaissance")
         from phantom_recon.core.web_recon import WebRecon
         url = f"https://{target}" if not target.startswith("http") else target
         web_results = WebRecon(url=url).run_full_recon()
@@ -590,9 +681,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Web reconnaissance failed: {e}")
 
-    # 6. Header Analysis
+    # 7. Header Analysis
     try:
-        section_header("Step 6/8: Header Analysis")
+        section_header("Step 7/9: Header Analysis")
         from phantom_recon.core.header_analyzer import HeaderAnalyzer
         url = f"https://{target}" if not target.startswith("http") else target
         header_data = HeaderAnalyzer(url=url).analyze()
@@ -601,9 +692,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"Header analysis failed: {e}")
 
-    # 7. SSL Analysis
+    # 8. SSL Analysis
     try:
-        section_header("Step 7/8: SSL/TLS Analysis")
+        section_header("Step 8/9: SSL/TLS Analysis")
         from phantom_recon.core.ssl_analyzer import SSLAnalyzer
         ssl_data = SSLAnalyzer(host=target).analyze()
         all_results["ssl"] = ssl_data
@@ -611,9 +702,9 @@ def full(ctx, target, output):
     except Exception as e:
         warning(f"SSL analysis failed: {e}")
 
-    # 8. Vulnerability Scan
+    # 9. Vulnerability Scan
     try:
-        section_header("Step 8/8: Vulnerability Scan")
+        section_header("Step 9/9: Vulnerability Scan")
         from phantom_recon.core.vuln_scanner import VulnerabilityScanner
         url = f"https://{target}" if not target.startswith("http") else target
         vuln_data = VulnerabilityScanner(url=url).scan_all()

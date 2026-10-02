@@ -672,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.5.1 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.5.2 (Zero False Positive)</strong></span>
                 </div>
             </div>
 
@@ -801,6 +801,56 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                 {% endif %}
             </article>
             {% endfor %}
+        </section>
+        {% endif %}
+
+        <!-- WAF & Origin IP Exposure Section -->
+        {% if data.get('waf') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>🛡️ Web Application Firewall & Origin IP Analysis</span>
+                {% if data.get('waf', {}).get('has_waf') %}
+                <span class="badge badge-critical" style="background: rgba(255, 51, 102, 0.2); border: 1px solid var(--neon-red); color: var(--neon-red);">PROTECTED: {{ data.get('waf', {}).get('waf_name') }}</span>
+                {% else %}
+                <span class="badge badge-verified">DIRECT HOST / NO WAF</span>
+                {% endif %}
+            </div>
+            
+            <div style="margin-bottom: 1.2rem; line-height: 1.8;">
+                <p><strong>Identified Provider:</strong> <span style="color: var(--neon-cyan); font-weight: 600;">{{ data.get('waf', {}).get('waf_name', 'None') }}</span></p>
+                {% if data.get('waf', {}).get('resolved_ips') %}
+                <p><strong>Resolved Edge IPs:</strong> <code>{{ data.get('waf', {}).get('resolved_ips')|join(', ') }}</code></p>
+                {% endif %}
+                {% if data.get('waf', {}).get('warning') %}
+                <div class="evidence-panel" style="margin-top: 0.8rem; border-left: 4px solid var(--neon-orange); color: #ffb74d;">
+                    {{ data.get('waf', {}).get('warning') }}
+                </div>
+                {% endif %}
+            </div>
+
+            {% if data.get('waf', {}).get('origin_leakage', {}).get('unprotected_origin_candidates') %}
+            <h4 style="color: var(--neon-red); margin: 1.2rem 0 0.6rem 0;">🚨 Potential Unproxied Backend Origin IPs (WAF Bypass Risk)</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Candidate IP</th>
+                        <th>Hostname</th>
+                        <th>Discovery Source</th>
+                        <th>Evidence / Note</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cand in data.get('waf', {}).get('origin_leakage', {}).get('unprotected_origin_candidates') %}
+                    <tr>
+                        <td><code style="color: var(--neon-red); font-weight: 700;">{{ cand.get('ip') }}</code></td>
+                        <td><strong>{{ cand.get('hostname') }}</strong></td>
+                        <td><span class="badge" style="background: rgba(255, 145, 0, 0.15); color: #ffb74d; border: 1px solid var(--neon-orange);">{{ cand.get('source') }}</span></td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ cand.get('evidence') }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
         </section>
         {% endif %}
 

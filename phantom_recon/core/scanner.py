@@ -252,6 +252,22 @@ class PortScanner:
         self._start_time = datetime.now()
         self._resolved_ip = self._resolve_target()
 
+        # Check if resolved IP belongs to a known cloud WAF/CDN proxy network
+        from phantom_recon.core.waf_detector import WAFDetector
+        is_waf, waf_provider = WAFDetector.is_ip_in_waf_cidr(self._resolved_ip)
+        waf_warning = None
+        if is_waf:
+            waf_warning = (
+                f"Target IP {self._resolved_ip} belongs to {waf_provider} CDN/WAF proxy network. "
+                f"Port scan probes {waf_provider} Anycast edge nodes, not the internal backend origin."
+            )
+            logger.warning(
+                f"[bold yellow]⚠️ NOTICE:[/bold yellow] Target IP [cyan]{self._resolved_ip}[/cyan] belongs to "
+                f"[bold red]{waf_provider}[/bold red] CDN/WAF proxy network!\n"
+                f"  [yellow]→ Port scanning will probe {waf_provider} Anycast edge nodes, NOT the internal backend origin.[/yellow]\n"
+                f"  [yellow]→ Use 'phantom waf -t {self.target}' to audit for unproxied origin IP leakage.[/yellow]"
+            )
+
         # Parse ports
         if self.port_spec.lower() == "top100":
             ports = TOP_100_PORTS
@@ -304,6 +320,9 @@ class PortScanner:
         return {
             "target": self.target,
             "ip": self._resolved_ip,
+            "is_waf_proxy": is_waf,
+            "waf_provider": waf_provider if is_waf else None,
+            "waf_warning": waf_warning,
             "scan_type": self.scan_type,
             "start_time": self._start_time.isoformat(),
             "end_time": self._end_time.isoformat(),

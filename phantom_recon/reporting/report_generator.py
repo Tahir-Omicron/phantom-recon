@@ -262,6 +262,34 @@ class ReportGenerator:
                     md_lines.append("---")
                     md_lines.append("")
 
+        # WAF / CDN Analysis
+        waf_data = self.scan_data.get("waf")
+        if waf_data and isinstance(waf_data, dict):
+            md_lines.append("## 🛡️ Web Application Firewall & CDN Analysis")
+            md_lines.append("")
+            has_waf = waf_data.get("has_waf", False)
+            waf_name = waf_data.get("waf_name", "None")
+            status = "Protected" if has_waf else "Direct / Unprotected"
+            md_lines.append(f"- **WAF / CDN Status:** `{status}`")
+            md_lines.append(f"- **Identified Provider:** `{waf_name}`")
+            resolved_ips = waf_data.get("resolved_ips", [])
+            if resolved_ips:
+                md_lines.append(f"- **Resolved Edge IPs:** `{', '.join(resolved_ips)}`")
+            if waf_data.get("warning"):
+                md_lines.append(f"- **Notice:** {waf_data.get('warning')}")
+
+            origin_leak = waf_data.get("origin_leakage", {})
+            unprot = origin_leak.get("unprotected_origin_candidates", [])
+            if unprot:
+                md_lines.append("")
+                md_lines.append("### 🚨 Potential Unproxied Origin IP Candidates (WAF Bypass Risk)")
+                md_lines.append("")
+                md_lines.append("| Candidate IP | Hostname | Discovery Source | Evidence |")
+                md_lines.append("| :--- | :--- | :--- | :--- |")
+                for c in unprot:
+                    md_lines.append(f"| `{c.get('ip')}` | `{c.get('hostname')}` | `{c.get('source')}` | {c.get('evidence')} |")
+            md_lines.append("")
+
         # Port scan
         ports = self.scan_data.get("ports", {})
         if ports and isinstance(ports, dict):
@@ -404,6 +432,24 @@ class ReportGenerator:
                     if isinstance(check, dict):
                         status = "✓" if check.get("secure") else "✗"
                         lines.append(f"  {status} {check.get('header', '')}: {check.get('value', 'missing')}")
+            lines.append("")
+
+        # WAF & Origin IP Audit
+        if "waf" in self.scan_data:
+            lines.append("WAF & ORIGIN IP AUDIT")
+            lines.append("-" * 40)
+            waf_data = self.scan_data["waf"]
+            if isinstance(waf_data, dict):
+                lines.append(f"  Protected: {waf_data.get('has_waf', False)}")
+                lines.append(f"  Provider:  {waf_data.get('waf_name', 'None')}")
+                if waf_data.get("warning"):
+                    lines.append(f"  Notice:    {waf_data.get('warning')}")
+                origin_leak = waf_data.get("origin_leakage", {})
+                unprot = origin_leak.get("unprotected_origin_candidates", [])
+                if unprot:
+                    lines.append("  Unprotected Origin Candidates:")
+                    for c in unprot:
+                        lines.append(f"    - IP: {c.get('ip')} | Host: {c.get('hostname')} | Source: {c.get('source')}")
             lines.append("")
 
         # SSL
