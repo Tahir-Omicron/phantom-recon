@@ -82,7 +82,7 @@ def print_banner() -> None:
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 2.0.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
+            "[dim]📌 Version 2.1.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing & defensive posture assessment only[/dim yellow]",
             border_style="red",
             box=box.ROUNDED,
@@ -133,6 +133,12 @@ def print_command_palette() -> None:
     )
     table.add_row(
         "🌐 Surface Recon",
+        "favicon",
+        "phantom favicon https://site.com",
+        "Favicon MurmurHash3 technology fingerprinting (Shodan MMH3 & Censys)."
+    )
+    table.add_row(
+        "🌐 Surface Recon",
         "subdomain",
         "phantom subdomain -d site.com --ct-logs",
         "Discover subdomains via Certificate Transparency & DNS brute force."
@@ -151,6 +157,12 @@ def print_command_palette() -> None:
     )
 
     # Category: Vulnerability & Defense
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "takeover",
+        "phantom takeover site.com",
+        "Subdomain takeover & dangling CNAME pointer auditor (17 cloud providers)."
+    )
     table.add_row(
         "🛡️ Vuln & Defense",
         "vuln",
@@ -180,6 +192,12 @@ def print_command_palette() -> None:
         "cms",
         "phantom cms -u https://site.com",
         "CMS & framework auditor (WordPress, Laravel, Django, .js.map source maps)."
+    )
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "policy",
+        "phantom policy https://site.com",
+        "RFC 9116 security.txt & sensitive robots.txt/sitemap surface auditor."
     )
     table.add_row(
         "🛡️ Vuln & Defense",
@@ -219,7 +237,7 @@ def print_command_palette() -> None:
         "📊 Master & Report",
         "full",
         "phantom full -t site.com -o report.html",
-        "Master 13-step full autonomous recon & vulnerability pipeline + HTML report."
+        "Master 15-step full autonomous recon & vulnerability pipeline + HTML report."
     )
     table.add_row(
         "📊 Master & Report",
@@ -247,7 +265,10 @@ def print_command_palette() -> None:
             "  [dim]•[/dim] [cyan]phantom cloud -t example.com[/cyan]                         → [dim]Audit AWS S3, GCP & Azure for publicly exposed buckets[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom waf -t example.com[/cyan]                           → [dim]Detect WAF front & audit for leaked origin server IPs[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom api -u https://example.com[/cyan]                           → [dim]Discover OpenAPI/Swagger schemas & GraphQL routes[/dim]\n"
-            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                          → [dim]End-to-end 13-stage autonomous penetration test recon[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom takeover example.com[/cyan]                      → [dim]Audit dangling CNAMEs across 17 cloud providers[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom favicon https://example.com[/cyan]               → [dim]Fingerprint stack with Shodan-compatible MMH3 hash[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom policy https://example.com[/cyan]                → [dim]Audit RFC 9116 security.txt & sensitive robots.txt[/dim]\n"
+            "  [dim]•[/dim] [cyan]phantom full -t example.com[/cyan]                          → [dim]End-to-end 15-stage autonomous penetration test recon[/dim]\n"
             "  [dim]•[/dim] [cyan]phantom scan -t 192.168.1.1 -p top100[/cyan]                → [dim]Scan top 100 ports with banner grabbing[/dim]",
             title="[bold yellow]💡 Pro Tips[/bold yellow]",
             border_style="yellow",

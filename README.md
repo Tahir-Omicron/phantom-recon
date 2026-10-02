@@ -5,20 +5,20 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v2.0.0)</strong>
+  <strong>Advanced Penetration Testing & Reconnaissance Toolkit (v2.1.0)</strong>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
-  <a href="#modules"><img src="https://img.shields.io/badge/modules-16+-red.svg?style=for-the-badge" alt="16+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-159%20passed-brightgreen.svg?style=for-the-badge" alt="159 Tests Passing"/></a>
+  <a href="#modules"><img src="https://img.shields.io/badge/modules-19+-red.svg?style=for-the-badge" alt="19+ Modules"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-181%20passed-brightgreen.svg?style=for-the-badge" alt="181 Tests Passing"/></a>
   <a href="https://github.com/Tahir-Omicron/phantom-recon/stargazers"><img src="https://img.shields.io/github/stars/Tahir-Omicron/phantom-recon?style=for-the-badge&color=yellow" alt="Stars"/></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
-  <a href="#whats-new-in-v200">What's New in v2.0.0</a> •
+  <a href="#whats-new-in-v210">What's New in v2.1.0</a> •
   <a href="#release-history">Release History</a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
@@ -27,6 +27,41 @@
   <a href="#testing">Testing</a> •
   <a href="#contributing">Contributing</a>
 </p>
+
+---
+
+## 🚀 What's New in v2.1.0
+
+- 🎨 **Favicon MurmurHash3 Technology Fingerprinting (`phantom favicon <url>`)**:
+  - Pure Python 32-bit x86 signed `mmh3_32` implementation — 100% bit-for-bit identical to Shodan `http.favicon.hash:<hash>` and `httpx` without any external native C-extensions or compilation requirements!
+  - MIME base64 standard encoding with 76-character chunking matching Shodan's algorithm.
+  - Built-in verified signature database matching enterprise applications: Spring Boot, Jenkins, GitLab, Jira, Confluence, Grafana, Kibana, FortiGate VPN, GlobalProtect VPN, phpMyAdmin, Keycloak, and more.
+  - Direct Shodan dork link generation for zero-request footprint intelligence.
+- 🎯 **Subdomain Takeover & Dangling DNS Pointer Auditor (`phantom takeover <target>`)**:
+  - Full parity with industry-standard takeover tools (Nuclei, Subjack, Subzy).
+  - Multi-threaded DNS CNAME resolution and active HTTP deprovisioned fingerprint inspection across **17 major cloud / SaaS providers**:
+    - GitHub Pages (`github.io`)
+    - AWS S3 & CloudFront (`s3.amazonaws.com`, `cloudfront.net`)
+    - Heroku (`herokuapp.com`)
+    - Microsoft Azure (`azurewebsites.net`, `cloudapp.net`, `trafficmanager.net`)
+    - Netlify & Vercel (`netlify.app`, `vercel.app`)
+    - Fastly CDN & Shopify (`fastly.net`, `myshopify.com`)
+    - Zendesk, Ghost, Surge.sh, Pantheon, WordPress.com, Webflow, Bitbucket, Unbounce.
+  - Zero-false-positive design: verifies actual provider error response bodies before escalating to Critical severity.
+- 📜 **RFC 9116 `security.txt` & Sensitive Surface Auditor (`phantom policy <url>`)**:
+  - Standardized RFC 9116 vulnerability disclosure policy validation at `/.well-known/security.txt` and `/security.txt`.
+  - Parses `Contact`, `Expires`, `Encryption`, `Preferred-Languages`, `Canonical`, and validates ISO 8601 expiry timestamps.
+  - Sensitive Disallowed Path Auditor: extracts `Disallow` rules from `robots.txt` (`/admin`, `/backup`, `/staging`, `/internal`, `/console`), tests live accessibility (HTTP 200 vs 403), and flags information disclosure risks.
+- ⚡ **15-Stage Master Autonomous Audit Pipeline (`phantom audit` & `phantom full`)**:
+  - Expanded autonomous reconnaissance and vulnerability audit engine from 13 to **15 comprehensive stages**:
+    - Stage 4: Subdomain Takeover & Dangling DNS Pointer Audit.
+    - Stage 8: Web Application Stack & Favicon MMH3 Fingerprinting.
+    - Stage 12: RFC 9116 Security.txt & Sensitive Robots/Sitemap Surface Audit.
+- 📊 **Enhanced HTML Security Dashboard & Command Palette**:
+  - Dedicated interactive UI cards for Favicon MMH3 hashes, Subdomain Takeover risks, and RFC 9116 compliance.
+  - Interactive Command Palette (`phantom help`) updated with new operational categories.
+- 🧪 **181 Automated Tests with 100% Pass Rate**:
+  - 22 new comprehensive tests covering pure-Python MMH3, favicon extraction, takeover signatures, policy auditor, and CLI commands.
 
 ---
 
@@ -59,10 +94,11 @@
 
 ---
 
-## 📜 Release History & Changelog (v1.0.0 — v2.0.0)
+## 📜 Release History & Changelog (v1.0.0 — v2.1.0)
 
 | Version | Release Focus | Key Additions & Fixes |
 | :--- | :--- | :--- |
+| **v2.1.0** | **Competitor Parity Upgrade: Favicon MMH3, Subdomain Takeover & RFC 9116 Policy** | • Pure-Python 32-bit MurmurHash3 engine for Shodan & Censys compatible favicon hashing (`phantom favicon`).<br>• Subdomain Takeover & Dangling DNS auditor across 17 cloud providers (`phantom takeover`).<br>• RFC 9116 `security.txt` & sensitive robots.txt/sitemap surface auditor (`phantom policy`).<br>• Master autonomous pipeline upgraded to 15 automated stages (`phantom audit` / `phantom full`).<br>• HTML dashboard updated with Favicon, Takeover, and RFC 9116 visual cards.<br>• Automated test suite expanded to **181 passing tests** (100% pass rate). |
 | **v2.0.0** | **Single-Command Autonomous Audit, Direct Findings Table & Perimeter Risk Engine** | • Autonomous Master Audit Engine (`phantom audit <target>`) running end-to-end scans in 1 command.<br>• Direct unified terminal Vulnerability Matrix Table with severity, impact, and fixes.<br>• Automatic target normalization (domain, URL, IP).<br>• Perimeter database & risky service detection (Redis, Telnet, SMB, DBs).<br>• Modernized `phantom full` with unified engine.<br>• Expanded test suite to **159 passing tests**. |
 | **v1.9.0** | **CMS & Framework Auditor, DevOps Manifests & JavaScript Source Maps** | • CMS & Framework Security Auditor (`phantom cms`) supporting WordPress, Laravel, Django, Next.js, Drupal, Joomla, and Spring Boot.<br>• WordPress REST API user enumeration, XML-RPC exposure, and debug log detection.<br>• Laravel log disclosure and exposed Telescope dashboard.<br>• Frontend JavaScript Source Map (`.js.map`) leakage discovery.<br>• DevOps infrastructure checks: `/docker-compose.yml`, `/terraform.tfstate`, `/Dockerfile`.<br>• Master pipeline expanded to 13 automated stages (`phantom full`).<br>• Expanded test suite to **143 passing tests**. |
 | **v1.8.0** | **HTTP Methods Auditor, Security Score & Sleek Red Team Banner** | • HTTP Methods & Dangerous Verbs Auditor (`phantom methods`) for PUT, DELETE, TRACE, and WebDAV.<br>• Executive Security Health Score (0-100, A+ to F) with terminal gauge and category breakdown.<br>• Master pipeline expanded to 12 automated stages (`phantom full`).<br>• Streamlined, zero-wrap horizontal terminal ASCII banner and sleek pixel cyber banner asset.<br>• Expanded test suite to **125 passing tests**. |
@@ -468,28 +504,70 @@ phantom report --input scan.json --format md --output report.md
 phantom report --input scan.json --format txt --output report.txt
 ```
 
-### 17. 🎯 Master Recon Pipeline (`phantom full`)
+### 17. 🎯 Subdomain Takeover & Dangling DNS Auditor (`phantom takeover`)
 
-Execute all 13 specialized reconnaissance and audit phases in sequence:
+Audit target domain and subdomains for dangling CNAME pointers to abandoned cloud infrastructure across 17 major providers (AWS S3, GitHub Pages, Heroku, Azure, Netlify, Vercel, Shopify, Fastly, etc.):
 
 ```bash
-phantom full --target example.com --output phantom_report.html
+# Audit target domain and automatically discover subdomains for takeover risks
+phantom takeover example.com
+
+# Multi-threaded takeover audit with custom concurrency
+phantom takeover example.com --threads 25
 ```
 
-**Pipeline Steps (13 Automated Stages):**
+### 18. 🎨 Favicon MurmurHash3 Technology Fingerprinting (`phantom favicon`)
+
+Extract favicon, compute Shodan-compatible 32-bit signed MurmurHash3 (MMH3), MD5, and SHA256 hashes, and fingerprint underlying web platforms without triggering WAF alarms:
+
+```bash
+# Fingerprint technology stack from favicon hash
+phantom favicon https://example.com
+
+# Inspect specific portal or admin console
+phantom favicon https://app.example.com:8443
+```
+
+### 19. 📜 RFC 9116 Security.txt & Sensitive Surface Auditor (`phantom policy`)
+
+Audit compliance with RFC 9116 vulnerability disclosure policies and identify hidden administrative consoles disclosed in `robots.txt`:
+
+```bash
+# Audit security.txt and robots.txt disallowed paths
+phantom policy https://example.com
+```
+
+### 20. ⚡ Autonomous Master Recon & Audit Pipeline (`phantom audit` / `phantom full`)
+
+Execute all 15 specialized reconnaissance and vulnerability assessment phases in sequence with a single command:
+
+```bash
+# Single-command end-to-end audit with instant terminal findings table
+phantom audit example.com
+
+# Rapid triage mode
+phantom audit example.com --fast
+
+# Export complete audit results to interactive HTML dashboard
+phantom audit example.com --output phantom_report.html
+```
+
+**Pipeline Steps (15 Automated Stages):**
 1. WHOIS Intelligence & Domain Attribution
-2. DNS Enumeration & Anti-Spoofing Policy Audit
-3. Subdomain Discovery & Takeover Inspection
-4. WAF & Origin IP Leakage Audit (Edge proxy identification & bypass check)
-5. Cloud Storage & Bucket Exposure Audit (AWS S3, GCP Storage, Azure Blob)
-6. Port Scanning & Service Identification
-7. Web Application Reconnaissance (Tech stack, directories, forms)
-8. API Schema & Documentation Reconnaissance (OpenAPI, GraphQL, Actuators)
-9. CMS & Framework Security Audit (WordPress, Laravel, Django, .js.map source maps)
-10. Security Header & Deep CSP Directive Analysis
-11. SSL/TLS Cryptographic Analysis
-12. HTTP Methods & Dangerous Verbs Audit (PUT, DELETE, TRACE, WebDAV)
-13. Ultra-Precision Vulnerability Scan, Finding Explanation Matrix & Security Scorecard
+2. DNS Enumeration & Anti-Spoofing Policy Audit (SPF & DMARC)
+3. Subdomain Discovery & Attack Surface Mapping
+4. Subdomain Takeover & Dangling DNS Pointer Audit (17 Cloud Providers)
+5. WAF Edge Detection & Backend Origin IP Leakage Audit
+6. Cloud Storage & Bucket Exposure Audit (AWS S3, GCP Storage, Azure Blob)
+7. Perimeter Port Scanning & Risky Database / Daemon Auditing (Redis, Telnet, SMB)
+8. Web Application Stack & Favicon MMH3 Fingerprinting
+9. API Schema & Documentation Reconnaissance (OpenAPI, GraphQL, Actuators)
+10. CMS & Framework Security Audit (WordPress, Laravel, Django, .js.map source maps)
+11. Security Header & Deep CSP Directive Analysis
+12. RFC 9116 Security.txt & Sensitive Robots/Sitemap Surface Audit
+13. SSL/TLS Protocol Inspection & Cryptographic Hygiene
+14. HTTP Methods & Dangerous Verbs Audit (PUT, DELETE, TRACE, WebDAV)
+15. Ultra-Precision Web Vulnerability Scan, Finding Explanation Matrix & Security Scorecard
 
 ---
 
@@ -525,16 +603,20 @@ pytest tests/ -v
 ```
 ============================= test session starts =============================
 platform win32 -- Python 3.12.10, pytest-9.1.1
-collected 107 items
+collected 181 items
 
-tests/test_scanner.py .............                                      [ 12%]
-tests/test_v160_features.py .........                                    [ 20%]
-tests/test_v170_features.py ..............                                [ 33%]
-tests/test_validators.py ..............................                  [ 61%]
-tests/test_vuln_scanner.py ..........................                    [ 85%]
+tests/test_scanner.py .............                                      [  7%]
+tests/test_v160_features.py .........                                    [ 12%]
+tests/test_v170_features.py ..............                                [ 20%]
+tests/test_v180_features.py ..................                            [ 30%]
+tests/test_v190_features.py .................                             [ 39%]
+tests/test_v200_features.py .................                             [ 49%]
+tests/test_v210_features.py ......................                        [ 61%]
+tests/test_validators.py ..............................                  [ 78%]
+tests/test_vuln_scanner.py ..........................                    [ 92%]
 tests/test_waf_detector.py ..............                                [100%]
 
-============================= 107 passed in 2.72s =============================
+============================= 181 passed in 5.57s =============================
 ```
 
 ---

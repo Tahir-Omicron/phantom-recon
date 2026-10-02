@@ -1,5 +1,5 @@
 """
-Phantom Recon — Ultra-Modern Enterprise Security Dashboard (v1.9.0).
+Phantom Recon — Ultra-Modern Enterprise Security Dashboard (v2.1.0).
 
 State-of-the-art dark glassmorphism cybersecurity report template featuring
 real-time interactive search, severity filtering, SVG security health gauge,
@@ -672,7 +672,7 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="chip">🎯 Target: <strong>{{ data.get('target', 'N/A') }}</strong></span>
                     <span class="chip">⏱️ Audit Time: <strong>{{ generated_at }}</strong></span>
                     <span class="chip">⚡ Duration: <strong>{{ data.get('duration', 'N/A') }}s</strong></span>
-                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v1.8.0 (Zero False Positive)</strong></span>
+                    <span class="chip">🛡️ Engine: <strong>Phantom Recon v2.1.0 (Zero False Positive)</strong></span>
                 </div>
             </div>
 
@@ -1021,6 +1021,95 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
         </section>
         {% endif %}
 
+        <!-- Favicon & Tech MMH3 Fingerprint Section -->
+        {% if data.get('favicon') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>🎨 Favicon MurmurHash3 & Technology Fingerprint</span>
+                {% if data.get('favicon', {}).get('identified_tech') %}
+                <span class="badge" style="background: rgba(0, 230, 118, 0.15); border: 1px solid var(--neon-green); color: var(--neon-green);">
+                    ✓ MATCH: {{ data.get('favicon', {}).get('identified_tech') }}
+                </span>
+                {% else %}
+                <span class="badge badge-info">PROFILED</span>
+                {% endif %}
+            </div>
+            <div style="margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    {% if data.get('favicon', {}).get('favicon_url') %}
+                    <img src="{{ data.get('favicon', {}).get('favicon_url') }}" alt="Favicon" style="width: 32px; height: 32px; border-radius: 6px; background: rgba(255,255,255,0.05); padding: 4px; border: 1px solid var(--border);" onerror="this.style.display='none'">
+                    {% endif %}
+                    <div>
+                        <div style="font-size: 0.95em; color: var(--text-main);">
+                            <strong>Shodan MMH3 Hash:</strong> <code style="color: var(--neon-cyan); font-weight: 700; font-size: 1.05em;">{{ data.get('favicon', {}).get('mmh3_hash') }}</code>
+                            {% if data.get('favicon', {}).get('identified_tech') %}
+                            &nbsp;➔ <strong style="color: var(--neon-green);">{{ data.get('favicon', {}).get('identified_tech') }}</strong> ({{ data.get('favicon', {}).get('vendor', 'Unknown') }})
+                            {% endif %}
+                        </div>
+                        <div style="font-size: 0.82em; color: var(--text-dim); margin-top: 3px;">
+                            Source: <a href="{{ data.get('favicon', {}).get('favicon_url') }}" target="_blank" rel="noopener noreferrer" style="color: #38bdf8;">{{ data.get('favicon', {}).get('favicon_url') }}</a> | MD5: <code>{{ data.get('favicon', {}).get('md5') }}</code>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <a href="https://www.shodan.io/search?query=http.favicon.hash%3A{{ data.get('favicon', {}).get('mmh3_hash') }}" target="_blank" rel="noopener noreferrer" class="btn-jump" style="padding: 6px 14px; font-size: 0.8em;">
+                        🌐 Search Shodan
+                    </a>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- RFC 9116 Policy & Sensitive Robots/Sitemap Surface Audit -->
+        {% if data.get('policy') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>📜 RFC 9116 Security.txt & Sensitive Surface Audit</span>
+                {% if data.get('policy', {}).get('security_txt', {}).get('found') %}
+                <span class="badge badge-verified">RFC 9116 COMPLIANT</span>
+                {% else %}
+                <span class="badge" style="background: rgba(255, 145, 0, 0.15); color: #ffb74d; border: 1px solid var(--neon-orange);">NO SECURITY.TXT</span>
+                {% endif %}
+            </div>
+            
+            <div style="margin-bottom: 1.2rem; font-size: 0.9em; line-height: 1.8;">
+                {% if data.get('policy', {}).get('security_txt', {}).get('found') %}
+                <p>
+                    <strong>Security.txt Location:</strong> <a href="{{ data.get('policy', {}).get('security_txt', {}).get('url') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan);">{{ data.get('policy', {}).get('security_txt', {}).get('url') }}</a>
+                    | <strong>Expires:</strong> <code>{{ data.get('policy', {}).get('security_txt', {}).get('fields', {}).get('Expires', ['N/A'])|join(', ') }}</code>
+                    | <strong>Contact:</strong> <code>{{ data.get('policy', {}).get('security_txt', {}).get('fields', {}).get('Contact', ['N/A'])|join(', ') }}</code>
+                </p>
+                {% else %}
+                <p style="color: var(--text-sub);">No standardized RFC 9116 <code>security.txt</code> vulnerability disclosure policy was discovered at <code>/.well-known/security.txt</code> or <code>/security.txt</code>.</p>
+                {% endif %}
+            </div>
+
+            {% if data.get('policy', {}).get('robots_txt', {}).get('sensitive_exposed') %}
+            <h4 style="color: var(--neon-orange); margin: 1rem 0 0.5rem 0;">⚠️ Sensitive Disallowed Paths Discovered in Robots.txt</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Path</th>
+                        <th>Target URL</th>
+                        <th>Status Code</th>
+                        <th>Exposure Assessment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exp in data.get('policy', {}).get('robots_txt', {}).get('sensitive_exposed', []) %}
+                    <tr>
+                        <td><code style="color: var(--neon-orange); font-weight: 700;">{{ exp.get('path') }}</code></td>
+                        <td><a href="{{ exp.get('url') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan); font-size: 0.9em;">{{ exp.get('url') }}</a></td>
+                        <td><span class="badge {% if exp.get('status_code') == 200 %}badge-critical{% else %}badge-info{% endif %}">HTTP {{ exp.get('status_code') }}</span></td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ exp.get('assessment') }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </section>
+        {% endif %}
+
         <!-- HTTP Methods & Dangerous Verbs Section -->
         {% if data.get('http_methods') %}
         <section class="content-card">
@@ -1118,6 +1207,40 @@ HTML_REPORT_TEMPLATE = """<!DOCTYPE html>
                         <td><code>{{ sub.get('ip', 'N/A') }}</code></td>
                         <td><span class="badge badge-info">{{ sub.get('status_code', 'N/A') }}</span></td>
                         <td><a href="http://{{ sub.get('subdomain', '') }}" target="_blank" rel="noopener noreferrer" style="color: var(--neon-cyan); text-decoration: none; font-weight: 600;">🔗 Open</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <!-- Subdomain Takeovers & Dangling DNS Records -->
+        {% if data.get('takeovers') %}
+        <section class="content-card">
+            <div class="content-title">
+                <span>🎯 Subdomain Takeover & Dangling DNS Records</span>
+                <span class="badge" style="background: rgba(255, 51, 102, 0.2); border: 1px solid var(--neon-red); color: var(--neon-red);">
+                    {{ data.get('takeovers', [])|length }} Dangling Records Detected
+                </span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target Subdomain</th>
+                        <th>Cloud Provider</th>
+                        <th>Dangling CNAME</th>
+                        <th>Takeover Status</th>
+                        <th>Evidence / Proof</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tk in data.get('takeovers', []) %}
+                    <tr>
+                        <td><strong style="color: var(--neon-red);">{{ tk.get('subdomain') }}</strong></td>
+                        <td><span class="badge" style="background: rgba(255, 145, 0, 0.15); color: #ffb74d; border: 1px solid var(--neon-orange);">{{ tk.get('provider') }}</span></td>
+                        <td><code style="color: var(--neon-cyan);">{{ tk.get('cname') }}</code></td>
+                        <td><span class="badge badge-critical">🚨 VULNERABLE</span></td>
+                        <td><span style="color: var(--text-sub); font-size: 0.9em;">{{ tk.get('evidence', '')[:100] }}</span></td>
                     </tr>
                     {% endfor %}
                 </tbody>

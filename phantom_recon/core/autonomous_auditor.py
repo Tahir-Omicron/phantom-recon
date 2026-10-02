@@ -57,11 +57,11 @@ class AuditFinding:
 
 class AutonomousAuditor:
     """
-    Unified Autonomous Security Assessment Engine.
-    Executes full reconnaissance & vulnerability assessment in a single unified run.
+    Unified Autonomous Security Assessment Engine (v2.1.0).
+    Executes full 15-stage reconnaissance & vulnerability assessment in a single unified run.
     """
 
-    TOTAL_STAGES = 13
+    TOTAL_STAGES = 15
 
     def __init__(
         self,
@@ -245,8 +245,47 @@ class AutonomousAuditor:
             except Exception as e:
                 logger.debug(f"Stage 3 error: {e}")
 
-        # ─── Stage 4: WAF Edge & Backend Origin IP Leakage Audit ──────
-        self._notify(4, "WAF Edge Detection & Unproxied Origin IP Leakage Audit")
+        # ─── Stage 4: Subdomain Takeover & Dangling DNS Pointer Audit ──
+        self._notify(4, "Subdomain Takeover & Dangling DNS Pointer Audit")
+        if self.target_type in ("domain", "url"):
+            try:
+                from phantom_recon.core.takeover import SubdomainTakeoverAuditor
+                takeover_candidates = [self.host]
+                if "subdomains" in self.scan_data and isinstance(self.scan_data["subdomains"], dict):
+                    takeover_candidates.extend(self.scan_data["subdomains"].get("subdomains", []))
+                takeover_candidates = list(dict.fromkeys(takeover_candidates))
+                if self.fast_mode:
+                    takeover_candidates = takeover_candidates[:20]
+
+                takeover_auditor = SubdomainTakeoverAuditor(
+                    targets=takeover_candidates,
+                    timeout=self.timeout,
+                    threads=self.threads,
+                )
+                takeover_results = takeover_auditor.audit_all()
+                self.scan_data["takeovers"] = takeover_results
+
+                for tk in takeover_results:
+                    self._add_finding(AuditFinding(
+                        title=tk["title"],
+                        severity=tk["severity"],
+                        cvss_score=tk["cvss_score"],
+                        category=tk["category"],
+                        location=tk["location"],
+                        description=(
+                            f"The domain '{tk['subdomain']}' has a dangling CNAME record pointing to {tk['provider']} ({tk['cname']}). "
+                            "Because the resource is unclaimed, an adversary can register the asset and take complete control over "
+                            "the subdomain, bypassing origin security policies and intercepting cookies/credentials."
+                        ),
+                        remediation=tk["remediation"],
+                        evidence=tk["evidence"],
+                        poc_url=tk["poc_url"],
+                    ))
+            except Exception as e:
+                logger.debug(f"Stage 4 error: {e}")
+
+        # ─── Stage 5: WAF Edge & Backend Origin IP Leakage Audit ──────
+        self._notify(5, "WAF Edge Detection & Unproxied Origin IP Leakage Audit")
         try:
             from phantom_recon.core.waf_detector import WAFDetector
             waf_detector = WAFDetector(target=self.host, timeout=self.timeout)
@@ -275,8 +314,8 @@ class AutonomousAuditor:
         except Exception as e:
             logger.debug(f"Stage 4 error: {e}")
 
-        # ─── Stage 5: Multi-Cloud Bucket Storage Audit ─────────────────
-        self._notify(5, "Multi-Cloud Storage & Bucket Leakage Audit (AWS/GCP/Azure)")
+        # ─── Stage 6: Multi-Cloud Bucket Storage Audit ─────────────────
+        self._notify(6, "Multi-Cloud Storage & Bucket Leakage Audit (AWS/GCP/Azure)")
         try:
             from phantom_recon.core.cloud_auditor import CloudAuditor
             cloud_auditor = CloudAuditor(
@@ -305,10 +344,10 @@ class AutonomousAuditor:
                         reproduce_curl=f"curl -i -k '{f.get('url')}'",
                     ))
         except Exception as e:
-            logger.debug(f"Stage 5 error: {e}")
+            logger.debug(f"Stage 6 error: {e}")
 
-        # ─── Stage 6: Perimeter Port Reconnaissance & Risky Services ───
-        self._notify(6, "Perimeter Port Scanning & Risky Database / Daemon Auditing")
+        # ─── Stage 7: Perimeter Port Reconnaissance & Risky Services ───
+        self._notify(7, "Perimeter Port Scanning & Risky Database / Daemon Auditing")
         try:
             from phantom_recon.core.scanner import PortScanner
             port_spec = "1-1024" if not self.fast_mode else ",".join(str(p) for p in TOP_100_PORTS[:25])
@@ -337,7 +376,7 @@ class AutonomousAuditor:
                         evidence=f"Port {port}/tcp is OPEN ({p_info.get('service', rule['service'])}) banner: {p_info.get('banner', '')[:60]}",
                     ))
         except Exception as e:
-            logger.debug(f"Stage 6 error: {e}")
+            logger.debug(f"Stage 7 error: {e}")
 
         # ─── Web Target Liveness & Protocol Resolution ────────────────
         web_active = self._adapt_web_url_and_check_liveness(self.scan_data.get("ports", {}))
@@ -345,23 +384,43 @@ class AutonomousAuditor:
         self.scan_data["url"] = self.url
         logger.info(f"Target web endpoint resolved to: [bold cyan]{self.url}[/bold cyan] (Web Active: {web_active})")
 
-        # ─── Stage 7: Web Application Stack & Tech Fingerprinting ──────
-        self._notify(7, "Web Application Reconnaissance & Stack Fingerprinting")
+        # ─── Stage 8: Web Application Stack & Favicon MMH3 Fingerprinting ───
+        self._notify(8, "Web Application Stack & Favicon MMH3 Fingerprinting")
         if web_active:
             try:
                 from phantom_recon.core.web_recon import WebRecon
+                from phantom_recon.core.favicon_analyzer import FaviconAnalyzer
+
                 web_recon = WebRecon(url=self.url, timeout=self.timeout)
                 web_results = web_recon.run_full_recon()
                 self.scan_data["technologies"] = web_results.get("technologies", [])
                 self.scan_data["directories"] = web_results.get("directories", [])
                 self.scan_data["forms"] = web_results.get("forms", [])
+
+                fav_analyzer = FaviconAnalyzer(target_url=self.url, timeout=self.timeout)
+                fav_res = fav_analyzer.analyze()
+                if fav_res:
+                    self.scan_data["favicon"] = fav_res.to_dict()
+                    if fav_res.identified_tech:
+                        logger.info(
+                            f"Favicon MMH3: [bold cyan]{fav_res.mmh3_hash}[/bold cyan] -> "
+                            f"[bold green]{fav_res.identified_tech}[/bold green] ({fav_res.vendor})"
+                        )
+                        tech_names = [t.get("name") if isinstance(t, dict) else t for t in self.scan_data["technologies"]]
+                        if fav_res.identified_tech not in tech_names:
+                            self.scan_data["technologies"].append({
+                                "name": fav_res.identified_tech,
+                                "category": fav_res.category,
+                                "confidence": fav_res.confidence,
+                                "method": "Favicon MMH3",
+                            })
             except Exception as e:
-                logger.debug(f"Stage 7 error: {e}")
+                logger.debug(f"Stage 8 error: {e}")
         else:
             logger.info(f"Target '{self.host}' has no active HTTP/HTTPS service. Skipping web app recon.")
 
-        # ─── Stage 8: API Discovery & Schema Auditing ───────────────────
-        self._notify(8, "API Discovery, Swagger/OpenAPI & GraphQL Auditing")
+        # ─── Stage 9: API Discovery & Schema Auditing ───────────────────
+        self._notify(9, "API Discovery, Swagger/OpenAPI & GraphQL Auditing")
         if web_active:
             try:
                 from phantom_recon.core.api_scanner import APIScanner
@@ -384,12 +443,12 @@ class AutonomousAuditor:
                             poc_url=api.get("url", self.url),
                         ))
             except Exception as e:
-                logger.debug(f"Stage 8 error: {e}")
+                logger.debug(f"Stage 9 error: {e}")
         else:
             logger.info(f"Skipping API audit because web service is not reachable on '{self.host}'.")
 
-        # ─── Stage 9: CMS & Framework Security Audit ───────────────────
-        self._notify(9, "CMS & Framework Security Audit (WordPress/Laravel/Django/.js.map)")
+        # ─── Stage 10: CMS & Framework Security Audit ───────────────────
+        self._notify(10, "CMS & Framework Security Audit (WordPress/Laravel/Django/.js.map)")
         if web_active:
             try:
                 from phantom_recon.core.cms_auditor import CMSAuditor
@@ -411,12 +470,12 @@ class AutonomousAuditor:
                         reproduce_curl=cf.get("reproduce_curl", f"curl -i -k '{cf.get('url', self.url)}'"),
                     ))
             except Exception as e:
-                logger.debug(f"Stage 9 error: {e}")
+                logger.debug(f"Stage 10 error: {e}")
         else:
             logger.info(f"Skipping CMS audit because web service is not reachable on '{self.host}'.")
 
-        # ─── Stage 10: Security Headers & Cookie Security ──────────────
-        self._notify(10, "Security Headers, CSP Directives & Cookie Security")
+        # ─── Stage 11: Security Headers & Cookie Security ──────────────
+        self._notify(11, "Security Headers, CSP Directives & Cookie Security")
         if web_active:
             try:
                 from phantom_recon.core.header_analyzer import HeaderAnalyzer
@@ -439,12 +498,38 @@ class AutonomousAuditor:
                             poc_url=self.url,
                         ))
             except Exception as e:
-                logger.debug(f"Stage 10 error: {e}")
+                logger.debug(f"Stage 11 error: {e}")
         else:
             logger.info(f"Skipping security headers audit because web service is not reachable on '{self.host}'.")
 
-        # ─── Stage 11: SSL/TLS Cryptographic Analysis ──────────────────
-        self._notify(11, "SSL/TLS Protocol Inspection & Cryptographic Hygiene")
+        # ─── Stage 12: RFC 9116 Security.txt & Sensitive Surface Audit ─
+        self._notify(12, "RFC 9116 Security.txt & Sensitive Robots/Sitemap Surface Audit")
+        if web_active:
+            try:
+                from phantom_recon.core.policy_auditor import PolicyAuditor
+                policy_auditor = PolicyAuditor(base_url=self.url, timeout=self.timeout)
+                policy_results = policy_auditor.run_full_policy_audit()
+                self.scan_data["policy"] = policy_results
+
+                for pf in policy_results.get("findings", []):
+                    self._add_finding(AuditFinding(
+                        title=pf["title"],
+                        severity=pf["severity"],
+                        cvss_score=pf.get("cvss_score", 3.0),
+                        category=pf.get("category", "Policy & Surface"),
+                        location=pf.get("location", self.url),
+                        description=pf["description"],
+                        remediation=pf.get("remediation", ""),
+                        evidence=pf.get("evidence", ""),
+                        poc_url=pf.get("poc_url", self.url),
+                    ))
+            except Exception as e:
+                logger.debug(f"Stage 12 error: {e}")
+        else:
+            logger.info(f"Skipping security.txt and surface audit because web service is not reachable on '{self.host}'.")
+
+        # ─── Stage 13: SSL/TLS Cryptographic Analysis ──────────────────
+        self._notify(13, "SSL/TLS Protocol Inspection & Cryptographic Hygiene")
         if self.target_type in ("domain", "url"):
             open_ports = self.scan_data.get("ports", {})
             has_443 = "443" in open_ports or 443 in open_ports or self.url.startswith("https://")
@@ -469,12 +554,12 @@ class AutonomousAuditor:
                             poc_url=f"https://{self.host}",
                         ))
                 except Exception as e:
-                    logger.debug(f"Stage 11 error: {e}")
+                    logger.debug(f"Stage 13 error: {e}")
             else:
                 logger.info(f"Target '{self.host}' does not expose HTTPS port 443. SSL inspection skipped.")
 
-        # ─── Stage 12: HTTP Methods & Dangerous Verbs Audit ────────────
-        self._notify(12, "HTTP Methods & Dangerous Verbs Audit (PUT/DELETE/TRACE/WebDAV)")
+        # ─── Stage 14: HTTP Methods & Dangerous Verbs Audit ────────────
+        self._notify(14, "HTTP Methods & Dangerous Verbs Audit (PUT/DELETE/TRACE/WebDAV)")
         if web_active:
             try:
                 from phantom_recon.core.http_methods import HTTPMethodsAuditor
@@ -497,12 +582,12 @@ class AutonomousAuditor:
                             reproduce_curl=f"curl -i -X {p.get('method')} -k '{self.url}'",
                         ))
             except Exception as e:
-                logger.debug(f"Stage 12 error: {e}")
+                logger.debug(f"Stage 14 error: {e}")
         else:
             logger.info(f"Skipping HTTP methods audit because web service is not reachable on '{self.host}'.")
 
-        # ─── Stage 13: Precision Web Vulnerability Scanner ─────────────
-        self._notify(13, "Precision Web Vulnerability Scanner & Deep Configuration Audit")
+        # ─── Stage 15: Precision Web Vulnerability Scanner ─────────────
+        self._notify(15, "Precision Web Vulnerability Scanner & Deep Configuration Audit")
         if web_active:
             try:
                 from phantom_recon.core.vuln_scanner import VulnerabilityScanner
@@ -527,7 +612,7 @@ class AutonomousAuditor:
                         reproduce_curl=wv.get("reproduce_curl", f"curl -i -k '{self.url}'"),
                     ))
             except Exception as e:
-                logger.debug(f"Stage 13 error: {e}")
+                logger.debug(f"Stage 15 error: {e}")
         else:
             logger.info(f"Skipping deep web vulnerability audit because web service is not reachable on '{self.host}'.")
 

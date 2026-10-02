@@ -48,6 +48,7 @@ reports/*.txt
 *.report.html
 *.report.json
 phantom_report.*
+phantom_audit_*
 
 # OS
 .DS_Store

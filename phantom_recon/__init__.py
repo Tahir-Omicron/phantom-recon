@@ -6,7 +6,7 @@
 ╚══════════════════════════════════════════════════════════════╝
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "Tahir"
 __license__ = "MIT"
 
@@ -26,6 +26,9 @@ from phantom_recon.core.cloud_auditor import CloudAuditor
 from phantom_recon.core.http_methods import HTTPMethodsAuditor
 from phantom_recon.core.cms_auditor import CMSAuditor
 from phantom_recon.core.autonomous_auditor import AutonomousAuditor
+from phantom_recon.core.favicon_analyzer import FaviconAnalyzer, calculate_shodan_favicon_hash
+from phantom_recon.core.takeover import SubdomainTakeoverAuditor
+from phantom_recon.core.policy_auditor import PolicyAuditor
 from phantom_recon.reporting.report_generator import ReportGenerator
 from phantom_recon.reporting.security_score import calculate_security_score
 
@@ -46,6 +49,10 @@ __all__ = [
     "HTTPMethodsAuditor",
     "CMSAuditor",
     "AutonomousAuditor",
+    "FaviconAnalyzer",
+    "calculate_shodan_favicon_hash",
+    "SubdomainTakeoverAuditor",
+    "PolicyAuditor",
     "ReportGenerator",
     "calculate_security_score",
 ]

@@ -604,6 +604,159 @@ def cms_cmd(ctx, url, timeout):
     _save_output(ctx, results)
 
 
+# ─── Subdomain Takeover & Dangling DNS Auditor ───────────────────
+@main.command("takeover")
+@click.argument("target_arg", required=False)
+@click.option("--target", "-t", default=None, help="Target domain or host.")
+@click.option("--threads", default=15, help="Number of concurrent threads.")
+@click.option("--timeout", default=5.0, help="Per-request timeout (seconds).")
+@click.pass_context
+def takeover_cmd(ctx, target_arg, target, threads, timeout):
+    """🚩 Subdomain Takeover & Dangling DNS Pointer Auditor."""
+    resolved_target = target_arg or target
+    if not resolved_target:
+        print_banner()
+        error("Hədəf göstərilməyib! İstifadə: phantom takeover example.com")
+        return
+
+    print_banner()
+    section_header(f"Subdomain Takeover Audit — {resolved_target}")
+
+    from phantom_recon.core.takeover import SubdomainTakeoverAuditor
+    from phantom_recon.core.subdomain import SubdomainFinder
+
+    info(f"Auditing target and discovering subdomains for dangling CNAME pointers: [bold cyan]{resolved_target}[/bold cyan]")
+    
+    # Discover subdomains first
+    finder = SubdomainFinder(domain=resolved_target, threads=threads, timeout=timeout)
+    sub_results = finder.find_all()
+    discovered_subs = [s.get("subdomain") for s in sub_results.get("subdomains", [])]
+    targets_to_check = list(dict.fromkeys([resolved_target] + discovered_subs))
+
+    info(f"Checking {len(targets_to_check)} candidate host(s) against 17 cloud provider takeover signatures...")
+    auditor = SubdomainTakeoverAuditor(targets=targets_to_check, threads=threads, timeout=timeout)
+    findings = auditor.audit_all()
+
+    if findings:
+        rows = []
+        for f in findings:
+            rows.append([
+                f.get("subdomain", ""),
+                f.get("provider", ""),
+                f.get("cname", ""),
+                severity_badge(f.get("severity", "high")),
+                f.get("matched_fingerprint", "")[:50],
+            ])
+        print_results_table(
+            f"Confirmed Subdomain Takeovers — {resolved_target}",
+            [("Subdomain", "bold"), ("Provider", "cyan"), ("Dangling CNAME", "dim"), ("Severity", ""), ("Fingerprint", "dim")],
+            rows,
+        )
+    else:
+        success(f"No dangling DNS CNAME pointers or takeover risks detected across {len(targets_to_check)} host(s).")
+
+    _save_output(ctx, {"target": resolved_target, "takeover_findings": findings, "checked_hosts": targets_to_check})
+
+
+# ─── Favicon MMH3 Technology Fingerprinting ──────────────────────
+@main.command("favicon")
+@click.argument("url_arg", required=False)
+@click.option("--url", "-u", default=None, help="Target application URL or domain.")
+@click.option("--timeout", default=5.0, help="Per-request timeout (seconds).")
+@click.pass_context
+def favicon_cmd(ctx, url_arg, url, timeout):
+    """🎨 Favicon MurmurHash3 Technology Fingerprinting (Shodan & Censys compatible)."""
+    resolved_url = url_arg or url
+    if not resolved_url:
+        print_banner()
+        error("Hədəf göstərilməyib! İstifadə: phantom favicon https://example.com")
+        return
+
+    print_banner()
+    section_header(f"Favicon MurmurHash3 Fingerprinting — {resolved_url}")
+
+    from phantom_recon.core.favicon_analyzer import FaviconAnalyzer
+
+    info(f"Extracting and computing MMH3 hash on: [bold cyan]{resolved_url}[/bold cyan]")
+    analyzer = FaviconAnalyzer(target_url=resolved_url, timeout=timeout)
+    res = analyzer.analyze()
+
+    if res:
+        data = res.to_dict()
+        console.print(f"  • Favicon URL:   [bold cyan]{data['favicon_url']}[/bold cyan]")
+        console.print(f"  • MurmurHash3:   [bold yellow]{data['mmh3_hash']}[/bold yellow] (Shodan MMH3)")
+        console.print(f"  • MD5 Hash:      [dim]{data['md5_hash']}[/dim]")
+        console.print(f"  • SHA256 Hash:   [dim]{data['sha256_hash']}[/dim]")
+        console.print(f"  • Shodan Dork:   [bold green]{data['shodan_query']}[/bold green]")
+
+        if data.get("identified_tech"):
+            success(f"Technology Identified: [bold green]{data['identified_tech']}[/bold green] ({data['vendor']}) — Category: {data['category']}")
+        else:
+            info("Favicon hashed successfully, but no matching signature found in enterprise database.")
+
+        _save_output(ctx, data)
+    else:
+        warning(f"No favicon could be retrieved from {resolved_url}.")
+
+
+# ─── RFC 9116 security.txt & Sensitive Surface Auditor ──────────
+@main.command("policy")
+@click.argument("url_arg", required=False)
+@click.option("--url", "-u", default=None, help="Target application URL or domain.")
+@click.option("--timeout", default=5.0, help="Per-request timeout (seconds).")
+@click.pass_context
+def policy_cmd(ctx, url_arg, url, timeout):
+    """📜 RFC 9116 security.txt & sensitive surface auditor."""
+    resolved_url = url_arg or url
+    if not resolved_url:
+        print_banner()
+        error("Hədəf göstərilməyib! İstifadə: phantom policy https://example.com")
+        return
+
+    print_banner()
+    section_header(f"Security Policy & Sensitive Surface Audit — {resolved_url}")
+
+    from phantom_recon.core.policy_auditor import PolicyAuditor
+
+    info(f"Auditing security.txt and robots.txt surface on: [bold cyan]{resolved_url}[/bold cyan]")
+    auditor = PolicyAuditor(base_url=resolved_url, timeout=timeout)
+    results = auditor.run_full_policy_audit()
+
+    sec = results.get("security_txt", {})
+    if sec.get("has_security_txt"):
+        if sec.get("compliant"):
+            success(f"RFC 9116 security.txt found and compliant: {sec.get('url')}")
+        else:
+            warning(f"RFC 9116 security.txt found but non-compliant: {sec.get('url')}")
+        for k, vals in sec.get("fields", {}).items():
+            console.print(f"    • {k.capitalize()}: {', '.join(vals)}")
+    else:
+        warning("No RFC 9116 security.txt detected.")
+
+    surface = results.get("sensitive_surface", {})
+    flagged = surface.get("flagged_sensitive_paths", [])
+    if flagged:
+        info(f"Discovered {len(flagged)} sensitive paths disallowed in robots.txt: {', '.join(flagged[:5])}")
+
+    findings = results.get("findings", [])
+    if findings:
+        rows = []
+        for f in findings:
+            rows.append([
+                f.get("title", ""),
+                severity_badge(f.get("severity", "info")),
+                f.get("location", ""),
+                f.get("evidence", "")[:60],
+            ])
+        print_results_table(
+            f"Policy & Surface Findings — {resolved_url}",
+            [("Finding", "bold"), ("Severity", ""), ("Location", "cyan"), ("Details", "dim")],
+            rows,
+        )
+
+    _save_output(ctx, results)
+
+
 # ─── Brute Force ─────────────────────────────────────────────────
 @main.command()
 @click.option("--target", "-t", required=True, help="Target host.")
@@ -825,7 +978,7 @@ def _execute_autonomous_audit(
     threads: int = 25,
     timeout: float = 6.0,
 ) -> None:
-    """Executes the master 13-stage autonomous audit and prints findings table directly."""
+    """Executes the master 15-stage autonomous audit and prints findings table directly."""
     if not target_input:
         print_banner()
         error("Hədəf təyin edilməyib! Zəhmət olmasa audit aparılacaq hədəfi daxil edin.")
@@ -856,7 +1009,7 @@ def _execute_autonomous_audit(
     ))
     console.print()
 
-    section_header("Avtonom Boru Kəməri İcra Edilir (13 Mərhələ)")
+    section_header("Avtonom Boru Kəməri İcra Edilir (15 Mərhələ)")
 
     from phantom_recon.core.autonomous_auditor import AutonomousAuditor
     auditor = AutonomousAuditor(
@@ -947,7 +1100,7 @@ def audit_cmd(ctx, target_arg, target, url, output, fast, threads, timeout):
 @click.option("--timeout", default=6.0, help="Per-request timeout in seconds.")
 @click.pass_context
 def full(ctx, target_arg, target, url, output, fast, threads, timeout):
-    """🎯 Full 13-stage autonomous reconnaissance and vulnerability audit."""
+    """🎯 Full 15-stage autonomous reconnaissance and vulnerability audit."""
     resolved_target = target_arg or target or url
     _execute_autonomous_audit(ctx, resolved_target, output, fast, threads, timeout)
 

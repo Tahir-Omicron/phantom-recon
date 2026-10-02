@@ -311,7 +311,7 @@ class TestReportGeneratorv180:
         html_file = tmp_path / "report.html"
         generator.generate_html(str(html_file))
         html_text = html_file.read_text(encoding="utf-8")
-        assert "Phantom Recon v1.8.0" in html_text
+        assert "Phantom Recon v" in html_text
         assert "HTTP Methods & Dangerous Verbs Audit" in html_text
 
 
