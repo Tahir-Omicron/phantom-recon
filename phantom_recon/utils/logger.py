@@ -448,19 +448,47 @@ def print_audit_findings_table(
         loc = v.get("location", "Global Target")
         desc = v.get("description", "No description provided.")
         remedy = v.get("remediation", "Review security policy.")
+        
+        # Format location with reproduction command if available
+        curl_cmd = v.get("reproduce_curl") or (f"curl -i -k '{v.get('poc_url')}'" if v.get("poc_url") else "")
+        if curl_cmd:
+            loc_cell = f"[bold cyan]{loc}[/bold cyan]\n\n[bold green]💻 PoC Test:[/bold green]\n[dim yellow]{curl_cmd}[/dim yellow]"
+        else:
+            loc_cell = f"[bold cyan]{loc}[/bold cyan]"
 
         table.add_row(
             str(idx),
             badge,
             cat,
             title_text,
-            loc,
+            loc_cell,
             desc,
             remedy,
         )
 
     console.print(table)
     console.print()
+
+    # Dedicated Actionable PoC Reproduction Box for Pentesters
+    poc_items = []
+    for idx, v in enumerate(vulns, 1):
+        if not isinstance(v, dict):
+            continue
+        c_cmd = v.get("reproduce_curl") or (f"curl -i -k '{v.get('poc_url')}'" if v.get("poc_url") else "")
+        if c_cmd:
+            sev_str = v.get("severity", "info").upper()
+            t_str = v.get("title", "Finding")
+            poc_items.append(f"  [bold dim]#{idx}[/bold dim] [bold red][{sev_str}][/bold red] [bold white]{t_str}[/bold white]\n  [bold green]➜[/bold green] [bright_cyan]{c_cmd}[/bright_cyan]")
+
+    if poc_items:
+        console.print(Panel(
+            "\n\n".join(poc_items[:10]),
+            title="[bold bright_yellow]⚡ Pentester üçün Birbaşa Doğrulama Əmrləri (Actionable PoC cURLs)[/bold bright_yellow]",
+            border_style="yellow",
+            box=box.ROUNDED,
+            padding=(1, 2),
+        ))
+        console.print()
 
 
 

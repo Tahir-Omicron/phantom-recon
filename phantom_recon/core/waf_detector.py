@@ -203,6 +203,28 @@ class OriginCandidate:
         }
 
 
+def is_routable_public_ip(ip: str) -> bool:
+    """Validate that IP is not 0.0.0.0, loopback, link-local, multicast, or private RFC 1918."""
+    try:
+        addr = ipaddress.ip_address(ip)
+        if addr.version != 4:
+            return False
+        if addr.is_unspecified or addr.is_loopback or addr.is_link_local or addr.is_multicast:
+            return False
+        if str(addr).startswith("0."):
+            return False
+        for net in (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+        ):
+            if addr in net:
+                return False
+        return True
+    except ValueError:
+        return False
+
+
 class WAFDetector:
     """
     Web Application Firewall (WAF) & Cloud CDN Detector.
@@ -394,6 +416,8 @@ class WAFDetector:
                 mx_host = mx.get("exchange", mx.get("value", "")).strip().rstrip(".")
                 try:
                     mx_ip = socket.gethostbyname(mx_host)
+                    if not is_routable_public_ip(mx_ip):
+                        continue
                     is_waf, provider = self.is_ip_in_waf_cidr(mx_ip)
                     if mx_ip not in seen_ips:
                         seen_ips.add(mx_ip)
@@ -420,7 +444,7 @@ class WAFDetector:
                     ip4_matches = re.findall(r"ip4:([0-9\.\/]+)", val)
                     for ip4_str in ip4_matches:
                         clean_ip = ip4_str.split("/")[0]
-                        if validate_ip(clean_ip) and clean_ip not in seen_ips:
+                        if validate_ip(clean_ip) and is_routable_public_ip(clean_ip) and clean_ip not in seen_ips:
                             seen_ips.add(clean_ip)
                             is_waf, provider = self.is_ip_in_waf_cidr(clean_ip)
                             candidates.append(OriginCandidate(
@@ -443,7 +467,7 @@ class WAFDetector:
             test_host = f"{sub}.{self.domain}"
             try:
                 sub_ip = socket.gethostbyname(test_host)
-                if sub_ip not in seen_ips:
+                if is_routable_public_ip(sub_ip) and sub_ip not in seen_ips:
                     seen_ips.add(sub_ip)
                     is_waf, provider = self.is_ip_in_waf_cidr(sub_ip)
                     candidates.append(OriginCandidate(

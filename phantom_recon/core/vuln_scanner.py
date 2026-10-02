@@ -247,6 +247,7 @@ class VulnerabilityScanner:
         timeout: float = 10.0,
         user_agent: Optional[str] = None,
         verify_ssl: bool = False,
+        skip_standalone_modules: bool = False,
     ):
         """
         Initialize the vulnerability scanner.
@@ -256,10 +257,12 @@ class VulnerabilityScanner:
             timeout: Network request timeout.
             user_agent: Custom User-Agent header.
             verify_ssl: Whether to verify SSL certificates.
+            skip_standalone_modules: Whether to skip standalone modules already run in master pipeline.
         """
         self.url = url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
+        self.skip_standalone_modules = skip_standalone_modules
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": user_agent or (
@@ -1430,12 +1433,13 @@ class VulnerabilityScanner:
 
         # Run all precision detection modules
         self.profile_404_baseline()
-        self.check_waf_and_origin_leakage()
-        self.check_api_and_docs()
-        self.check_cloud_storage()
-        self.check_cms_and_frameworks()
-        self.check_http_methods()
-        self.check_security_headers()
+        if not self.skip_standalone_modules:
+            self.check_waf_and_origin_leakage()
+            self.check_api_and_docs()
+            self.check_cloud_storage()
+            self.check_cms_and_frameworks()
+            self.check_http_methods()
+            self.check_security_headers()
         self.check_cookie_security()
         self.check_cors()
         self.check_clickjacking()
@@ -1447,7 +1451,8 @@ class VulnerabilityScanner:
         self.check_email_security()
         self.check_javascript_secrets()
         self.check_information_disclosure()
-        self.check_ssl_issues()
+        if not self.skip_standalone_modules:
+            self.check_ssl_issues()
 
         # Sort by severity and CVSS score
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}

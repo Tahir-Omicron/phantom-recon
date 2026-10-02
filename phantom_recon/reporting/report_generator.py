@@ -18,6 +18,18 @@ from phantom_recon.utils.logger import get_logger, console
 
 logger = get_logger(__name__)
 
+def _make_json_safe(obj: Any) -> Any:
+    """Recursively convert custom dataclasses and objects to JSON-serializable primitives."""
+    if hasattr(obj, "to_dict"):
+        return _make_json_safe(obj.to_dict())
+    if isinstance(obj, dict):
+        return {k: _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_make_json_safe(item) for item in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    return str(obj)
+
 
 class ReportGenerator:
     """
@@ -56,8 +68,9 @@ class ReportGenerator:
         try:
             from jinja2 import Template
             template = Template(HTML_REPORT_TEMPLATE)
+            safe_data = _make_json_safe(self.scan_data)
             html_content = template.render(
-                data=self.scan_data,
+                data=safe_data,
                 timestamp=self.timestamp,
                 generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )

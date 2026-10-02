@@ -322,6 +322,7 @@ class AutonomousAuditor:
                 target=self.host,
                 threads=self.threads,
                 timeout=self.timeout,
+                high_confidence_only=True,
             )
             cloud_results = cloud_auditor.run_cloud_audit()
             self.scan_data["cloud_storage"] = cloud_results
@@ -595,6 +596,7 @@ class AutonomousAuditor:
                     url=self.url,
                     timeout=self.timeout,
                     verify_ssl=self.verify_ssl,
+                    skip_standalone_modules=True,
                 )
                 web_vulns = vuln_scanner.scan_all()
 

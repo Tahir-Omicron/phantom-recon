@@ -87,6 +87,7 @@ class CloudAuditor:
         threads: int = 15,
         user_agent: Optional[str] = None,
         custom_wordlist: Optional[list[str]] = None,
+        high_confidence_only: bool = False,
     ):
         """
         Initialize CloudAuditor.
@@ -97,11 +98,13 @@ class CloudAuditor:
             threads: Concurrency thread count.
             user_agent: Custom HTTP User-Agent.
             custom_wordlist: Optional custom bucket names/words to test.
+            high_confidence_only: Only generate bucket names strictly containing the target domain.
         """
         self.target = target.strip()
         self.timeout = timeout
         self.threads = max(1, min(threads, 50))
         self.custom_wordlist = custom_wordlist or []
+        self.high_confidence_only = high_confidence_only
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": user_agent or (
@@ -173,6 +176,35 @@ class CloudAuditor:
         """
         Generate bucket candidate names using smart permutations.
         """
+        if self.high_confidence_only:
+            # High-confidence target-specific bucket candidates only (zero false positive)
+            raw = self.target.lower().strip()
+            if raw.startswith(("http://", "https://")):
+                parsed = urlparse(raw)
+                host = parsed.netloc or parsed.path
+            else:
+                host = raw.split(":")[0].strip("/")
+            
+            clean_host = host.lower()
+            clean_nodot = clean_host.replace(".", "-")
+            clean_nodot2 = clean_host.replace(".", "")
+            
+            high_conf = {clean_host, clean_nodot, clean_nodot2}
+            
+            # Common sub-assets prefixed with full target identity
+            for sub in ("assets", "static", "media", "backup", "files", "data", "public", "cdn", "uploads", "images"):
+                high_conf.add(f"{clean_nodot}-{sub}")
+                high_conf.add(f"{sub}-{clean_nodot}")
+                high_conf.add(f"{sub}.{clean_host}")
+                high_conf.add(f"{clean_host}.{sub}")
+
+            # Also add custom words if provided
+            for w in self.custom_wordlist:
+                high_conf.add(w.strip().lower())
+
+            valid = [c for c in high_conf if 3 <= len(c) <= 63 and not c.startswith("-") and not c.endswith("-")]
+            return sorted(list(set(valid)))
+
         keywords = self.extract_keywords()
         bucket_candidates = set()
 

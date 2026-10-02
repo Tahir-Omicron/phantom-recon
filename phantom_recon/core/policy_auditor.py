@@ -45,6 +45,9 @@ class PolicyFinding:
     evidence: str
     poc_url: str
 
+    def __getitem__(self, item: str) -> Any:
+        return self.to_dict()[item]
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "title": self.title,
@@ -275,7 +278,8 @@ class PolicyAuditor:
 
         all_findings = []
         if sec_txt.get("finding"):
-            all_findings.append(sec_txt["finding"].to_dict())
+            f = sec_txt["finding"]
+            all_findings.append(f if isinstance(f, dict) else f.to_dict())
         all_findings.extend(surface.get("findings", []))
 
         return {
