@@ -399,6 +399,39 @@ def print_vulnerabilities_matrix(
     console.print()
 
 
+def format_poc_command(v: dict, fallback_target: str = "") -> str:
+    """
+    Format an actionable, realistic reproduction command for a vulnerability.
+    Uses nslookup for DNS/DMARC/SPF, and curl for web HTTP endpoints.
+    """
+    c_cmd = (v.get("reproduce_curl") or "").strip()
+    if c_cmd and not c_cmd.startswith("curl -i -k 'DNS:") and not c_cmd.startswith("curl -i -k '_dmarc."):
+        return c_cmd
+
+    poc_url = (v.get("poc_url") or "").strip()
+    loc = (v.get("location") or "").strip()
+    cat = (v.get("category") or "").lower()
+    title = (v.get("title") or "").lower()
+
+    # DNS / DMARC / SPF commands MUST use nslookup, NEVER curl!
+    if "dns" in cat or "email" in cat or "dmarc" in title or "spf" in title or "dmarc" in loc.lower() or "spf" in loc.lower():
+        if "dmarc" in title or "dmarc" in loc.lower():
+            target_host = loc.replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"")
+            if not target_host.startswith("_dmarc."):
+                target_host = f"_dmarc.{target_host.lstrip('.')}"
+            return f"nslookup -type=TXT {target_host}"
+        else:
+            target_host = loc.replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"")
+            if not target_host:
+                target_host = fallback_target
+            return f"nslookup -type=TXT {target_host}"
+
+    if poc_url.startswith("http://") or poc_url.startswith("https://"):
+        return f"curl -i -k '{poc_url}'"
+
+    return ""
+
+
 def print_audit_findings_table(
     vulns: list[dict],
     target: str,
@@ -412,7 +445,7 @@ def print_audit_findings_table(
     if not vulns:
         console.print(Panel(
             "[bold green]✓ TƏBƏRÜK! Hədəf sistemdə heç bir kritik və ya təsdiqlənmiş zəiflik aşkar edilmədi.[/bold green]\n"
-            f"[dim white]Hədəf: [bold cyan]{target}[/bold cyan] | Bütün 13 təhlükəsizlik nəzarət modulu yoxlanıldı ({duration:.2f}s).[/dim white]",
+            f"[dim white]Hədəf: [bold cyan]{target}[/bold cyan] | Bütün 15 təhlükəsizlik nəzarət modulu yoxlanıldı ({duration:.2f}s).[/dim white]",
             title="🛡️  Audit Yekunu: TƏMİZ VƏ TƏHLÜKƏSİZ SİSTEM (A+)",
             border_style="green",
             box=box.ROUNDED,
@@ -450,9 +483,9 @@ def print_audit_findings_table(
         remedy = v.get("remediation", "Review security policy.")
         
         # Format location with reproduction command if available
-        curl_cmd = v.get("reproduce_curl") or (f"curl -i -k '{v.get('poc_url')}'" if v.get("poc_url") else "")
-        if curl_cmd:
-            loc_cell = f"[bold cyan]{loc}[/bold cyan]\n\n[bold green]💻 PoC Test:[/bold green]\n[dim yellow]{curl_cmd}[/dim yellow]"
+        poc_cmd = format_poc_command(v, target)
+        if poc_cmd:
+            loc_cell = f"[bold cyan]{loc}[/bold cyan]\n\n[bold green]💻 PoC Test:[/bold green]\n[dim yellow]{poc_cmd}[/dim yellow]"
         else:
             loc_cell = f"[bold cyan]{loc}[/bold cyan]"
 
@@ -474,16 +507,16 @@ def print_audit_findings_table(
     for idx, v in enumerate(vulns, 1):
         if not isinstance(v, dict):
             continue
-        c_cmd = v.get("reproduce_curl") or (f"curl -i -k '{v.get('poc_url')}'" if v.get("poc_url") else "")
-        if c_cmd:
+        poc_cmd = format_poc_command(v, target)
+        if poc_cmd:
             sev_str = v.get("severity", "info").upper()
             t_str = v.get("title", "Finding")
-            poc_items.append(f"  [bold dim]#{idx}[/bold dim] [bold red][{sev_str}][/bold red] [bold white]{t_str}[/bold white]\n  [bold green]➜[/bold green] [bright_cyan]{c_cmd}[/bright_cyan]")
+            poc_items.append(f"  [bold dim]#{idx}[/bold dim] [bold red][{sev_str}][/bold red] [bold white]{t_str}[/bold white]\n  [bold green]➜[/bold green] [bright_cyan]{poc_cmd}[/bright_cyan]")
 
     if poc_items:
         console.print(Panel(
             "\n\n".join(poc_items[:10]),
-            title="[bold bright_yellow]⚡ Pentester üçün Birbaşa Doğrulama Əmrləri (Actionable PoC cURLs)[/bold bright_yellow]",
+            title="[bold bright_yellow]⚡ Pentester üçün Birbaşa Doğrulama Əmrləri (Actionable PoC Commands)[/bold bright_yellow]",
             border_style="yellow",
             box=box.ROUNDED,
             padding=(1, 2),

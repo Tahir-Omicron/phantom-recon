@@ -33,6 +33,7 @@ from phantom_recon.utils.logger import (
     print_scan_summary,
     print_security_score_gauge,
     print_audit_findings_table,
+    format_poc_command,
     severity_badge,
 )
 from phantom_recon import __version__
@@ -1032,11 +1033,15 @@ def _execute_autonomous_audit(
         console.print("[bold yellow]📍 TƏKRARLAMA (PROOF-OF-CONCEPT) VƏ BİRBAŞA ƏLAQƏ ƏMRLƏRİ:[/bold yellow]\n")
         for idx, v in enumerate(vulns[:8], 1):
             poc_link = v.get("poc_url") or base_url
-            curl_cmd = v.get("reproduce_curl") or f"curl -i -k '{poc_link}'"
+            poc_cmd = format_poc_command(v, host)
             console.print(f"  [bold white]#{idx} {v['title']}[/bold white] ({severity_badge(v['severity'])})")
             console.print(f"     [bold cyan]📍 Məkan:[/bold cyan]    {v.get('location', 'Global')}")
-            console.print(f"     [bold green]🔗 Birbaşa:[/bold green]  [link={poc_link}][bold underline cyan]{poc_link}[/bold underline cyan][/link]")
-            console.print(f"     [bold magenta]💻 PoC cURL:[/bold magenta] [dim]{curl_cmd}[/dim]")
+            if poc_link.startswith("http://") or poc_link.startswith("https://"):
+                console.print(f"     [bold green]🔗 Birbaşa:[/bold green]  [link={poc_link}][bold underline cyan]{poc_link}[/bold underline cyan][/link]")
+            else:
+                console.print(f"     [bold green]🔗 Mənbə:[/bold green]    [cyan]{poc_link}[/cyan]")
+            if poc_cmd:
+                console.print(f"     [bold magenta]💻 PoC Əmri:[/bold magenta] [dim]{poc_cmd}[/dim]")
             if v.get("evidence"):
                 console.print(f"     [dim]📋 Sübut:    {v.get('evidence')[:120]}...[/dim]")
             console.print(f"     [bold green]💡 Düzəliş:[/bold green]   {v.get('remediation', 'N/A')}\n")

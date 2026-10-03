@@ -96,13 +96,19 @@ class AutonomousAuditor:
 
     def _add_finding(self, finding: AuditFinding) -> None:
         # Avoid duplicate titles or duplicate targets across stages
+        f_title_lower = finding.title.lower()
+        f_cat_lower = finding.category.lower()
+
         for existing in self.findings:
+            e_title_lower = existing.title.lower()
+            e_cat_lower = existing.category.lower()
+
             # 1. Exact match on title and location
             if existing.title == finding.title and existing.location == finding.location:
                 return
 
             # 2. Cloud storage bucket deduplication
-            if ("cloud" in existing.category.lower() or "cloud" in finding.category.lower()) and (
+            if ("cloud" in e_cat_lower or "cloud" in f_cat_lower) and (
                 (existing.poc_url and existing.poc_url == finding.poc_url) or
                 (existing.location and existing.location == finding.location) or
                 (finding.poc_url and existing.poc_url and (finding.poc_url in existing.poc_url or existing.poc_url in finding.poc_url))
@@ -115,7 +121,39 @@ class AutonomousAuditor:
                     existing.evidence = finding.evidence or existing.evidence
                 return
 
-            # 3. Duplicate title on same domain / host
+            # 3. DMARC Anti-Spoofing Policy deduplication (cross-stage)
+            if "dmarc" in e_title_lower and "dmarc" in f_title_lower:
+                if finding.cvss_score > existing.cvss_score:
+                    existing.title = finding.title
+                    existing.severity = finding.severity
+                    existing.cvss_score = finding.cvss_score
+                    existing.description = finding.description
+                    existing.remediation = finding.remediation or existing.remediation
+                    existing.reproduce_curl = finding.reproduce_curl or existing.reproduce_curl
+                return
+
+            # 4. SPF Anti-Spoofing Policy deduplication (cross-stage)
+            if "spf" in e_title_lower and "spf" in f_title_lower:
+                if finding.cvss_score > existing.cvss_score:
+                    existing.title = finding.title
+                    existing.severity = finding.severity
+                    existing.cvss_score = finding.cvss_score
+                    existing.description = finding.description
+                    existing.remediation = finding.remediation or existing.remediation
+                    existing.reproduce_curl = finding.reproduce_curl or existing.reproduce_curl
+                return
+
+            # 5. Security Header deduplication (HSTS, CSP, Clickjacking/X-Frame-Options)
+            for hdr_kw in ("content-security-policy", "strict-transport-security", "frame protection", "clickjacking"):
+                if hdr_kw in e_title_lower and hdr_kw in f_title_lower:
+                    if finding.cvss_score > existing.cvss_score:
+                        existing.title = finding.title
+                        existing.severity = finding.severity
+                        existing.cvss_score = finding.cvss_score
+                        existing.description = finding.description
+                    return
+
+            # 6. Duplicate title on same domain / host
             if existing.title == finding.title:
                 return
 
@@ -125,6 +163,7 @@ class AutonomousAuditor:
         """
         Dynamically determine if web services (HTTP/HTTPS) are responsive,
         and adapt self.url to the active listening scheme and port.
+        Always probes HTTPS first because modern enterprise sites default to HTTPS.
         """
         # If user explicitly supplied scheme and/or port
         if self.raw_target.startswith("http://") or self.raw_target.startswith("https://"):
@@ -137,26 +176,27 @@ class AutonomousAuditor:
             except (ValueError, TypeError):
                 pass
 
-        # Case A: Port 443 is confirmed open
+        # Case A: Port 443 is confirmed open in port scan
         if 443 in open_port_ints:
             self.url = f"https://{self.host}"
             return True
 
-        # Case B: Port 80 is open and 443 is NOT open
-        if 80 in open_port_ints and 443 not in open_port_ints:
-            self.url = f"http://{self.host}"
-            return True
-
-        # Case C: Active probe if ports weren't scanned or neither 80/443 found
+        # Case B: Modern HTTPS probe (even if port scan was filtered or fast)
         try:
-            requests.head(f"https://{self.host}", timeout=2.0, verify=False, allow_redirects=True)
+            resp = requests.head(f"https://{self.host}", timeout=3.0, verify=False, allow_redirects=True)
             self.url = f"https://{self.host}"
             return True
         except Exception:
             pass
 
+        # Case C: Port 80 is confirmed open in port scan
+        if 80 in open_port_ints:
+            self.url = f"http://{self.host}"
+            return True
+
+        # Case D: Active HTTP probe
         try:
-            requests.head(f"http://{self.host}", timeout=2.0, verify=False, allow_redirects=True)
+            resp = requests.head(f"http://{self.host}", timeout=3.0, verify=False, allow_redirects=True)
             self.url = f"http://{self.host}"
             return True
         except Exception:
@@ -209,8 +249,10 @@ class AutonomousAuditor:
                             f"The domain '{self.host}' lacks a published DMARC DNS record. Attackers can forge "
                             "phishing emails masquerading as legitimate organizational correspondence."
                         ),
-                        remediation=f"Publish a DMARC TXT record at '_dmarc.{self.host}' (e.g. 'v=DMARC1; p=reject;').",
+                        remediation=f"Publish a DMARC TXT record at '_dmarc.{self.host}' (e.g. 'v=DMARC1; p=reject; rua=mailto:dmarc-reports@{self.host}').",
                         evidence="No TXT record found at _dmarc." + self.host,
+                        poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a{self.host}",
+                        reproduce_curl=f"nslookup -type=TXT _dmarc.{self.host}",
                     ))
 
                 if not spf.get("has_spf"):
@@ -219,13 +261,15 @@ class AutonomousAuditor:
                         severity="low",
                         cvss_score=3.5,
                         category="DNS / Email Security",
-                        location=f"DNS: {self.host}",
+                        location=f"DNS TXT: {self.host}",
                         description=(
                             f"The domain '{self.host}' does not publish an SPF (Sender Policy Framework) record, "
                             "permitting unauthorized mail servers to dispatch emails claiming to originate from this domain."
                         ),
-                        remediation=f"Publish an SPF TXT record on {self.host} (e.g. 'v=spf1 include:_spf.example.com -all').",
+                        remediation=f"Publish an SPF TXT record on {self.host} (e.g. 'v=spf1 mx include:_spf.example.com -all').",
                         evidence="No TXT record with 'v=spf1' located.",
+                        poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=spf%3a{self.host}",
+                        reproduce_curl=f"nslookup -type=TXT {self.host}",
                     ))
             except Exception as e:
                 logger.debug(f"Stage 2 error: {e}")
@@ -351,7 +395,12 @@ class AutonomousAuditor:
         self._notify(7, "Perimeter Port Scanning & Risky Database / Daemon Auditing")
         try:
             from phantom_recon.core.scanner import PortScanner
-            port_spec = "1-1024" if not self.fast_mode else ",".join(str(p) for p in TOP_100_PORTS[:25])
+            if self.fast_mode:
+                # Essential perimeter ports: web (80, 443, 8080, 8443), mail, databases, remote access
+                fast_ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1433, 3306, 3389, 5432, 6379, 8000, 8080, 8443, 9200, 27017]
+                port_spec = ",".join(str(p) for p in fast_ports)
+            else:
+                port_spec = "1-1024"
             scanner = PortScanner(
                 target=self.host,
                 ports=port_spec,
@@ -534,6 +583,13 @@ class AutonomousAuditor:
         if self.target_type in ("domain", "url"):
             open_ports = self.scan_data.get("ports", {})
             has_443 = "443" in open_ports or 443 in open_ports or self.url.startswith("https://")
+            if not has_443:
+                try:
+                    import socket
+                    with socket.create_connection((self.host, 443), timeout=3.0):
+                        has_443 = True
+                except Exception:
+                    pass
             if has_443:
                 try:
                     from phantom_recon.core.ssl_analyzer import SSLAnalyzer

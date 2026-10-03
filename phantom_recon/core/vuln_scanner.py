@@ -1448,10 +1448,10 @@ class VulnerabilityScanner:
         self.check_parameter_reflection()
         self.check_open_redirect()
         self.check_http_trace_xst()
-        self.check_email_security()
         self.check_javascript_secrets()
         self.check_information_disclosure()
         if not self.skip_standalone_modules:
+            self.check_email_security()
             self.check_ssl_issues()
 
         # Sort by severity and CVSS score
