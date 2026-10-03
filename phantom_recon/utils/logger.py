@@ -404,11 +404,6 @@ def format_poc_command(v: dict, fallback_target: str = "") -> str:
     Format an actionable, realistic reproduction command for a vulnerability.
     Uses nslookup for DNS/DMARC/SPF, and curl for web HTTP endpoints.
     """
-    c_cmd = (v.get("reproduce_curl") or "").strip()
-    if c_cmd and not c_cmd.startswith("curl -i -k 'DNS:") and not c_cmd.startswith("curl -i -k '_dmarc."):
-        return c_cmd
-
-    poc_url = (v.get("poc_url") or "").strip()
     loc = (v.get("location") or "").strip()
     cat = (v.get("category") or "").lower()
     title = (v.get("title") or "").lower()
@@ -417,7 +412,9 @@ def format_poc_command(v: dict, fallback_target: str = "") -> str:
     if "dns" in cat or "email" in cat or "dmarc" in title or "spf" in title or "dmarc" in loc.lower() or "spf" in loc.lower():
         if "dmarc" in title or "dmarc" in loc.lower():
             target_host = loc.replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"")
-            if not target_host.startswith("_dmarc."):
+            if not target_host or target_host == fallback_target:
+                target_host = f"_dmarc.{fallback_target}"
+            elif not target_host.startswith("_dmarc."):
                 target_host = f"_dmarc.{target_host.lstrip('.')}"
             return f"nslookup -type=TXT {target_host}"
         else:
@@ -426,6 +423,11 @@ def format_poc_command(v: dict, fallback_target: str = "") -> str:
                 target_host = fallback_target
             return f"nslookup -type=TXT {target_host}"
 
+    c_cmd = (v.get("reproduce_curl") or "").strip()
+    if c_cmd and not c_cmd.startswith("curl -i -k 'DNS:") and not c_cmd.startswith("curl -i -k '_dmarc.") and "mxtoolbox.com" not in c_cmd:
+        return c_cmd
+
+    poc_url = (v.get("poc_url") or "").strip()
     if poc_url.startswith("http://") or poc_url.startswith("https://"):
         return f"curl -i -k '{poc_url}'"
 

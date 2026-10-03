@@ -239,57 +239,128 @@ class SubdomainFinder:
         logger.info(f"Found [bold green]{len(found)}[/bold green] subdomains via brute force")
         return found
 
-    def ct_search(self) -> list[dict[str, Any]]:
-        """
-        Search Certificate Transparency logs via crt.sh.
-
-        Returns:
-            List of subdomains found in CT logs.
-        """
-        logger.info(f"Searching CT logs for [bold magenta]{self.domain}[/bold magenta]")
-
-        found: list[dict[str, Any]] = []
-        seen_domains: set[str] = set()
-
+    def _search_crtsh(self) -> list[dict[str, Any]]:
+        """Search Certificate Transparency logs via crt.sh with timeout guard."""
+        results: list[dict[str, Any]] = []
+        seen: set[str] = set()
         try:
             resp = requests.get(
                 f"https://crt.sh/?q=%.{self.domain}&output=json",
-                timeout=15,
+                timeout=7.0,
             )
-
             if resp.status_code == 200:
                 data = resp.json()
                 for entry in data:
                     name = entry.get("name_value", "")
-                    # Handle multi-line names
                     for subdomain in name.split("\n"):
                         subdomain = subdomain.strip().lower()
                         if (
                             subdomain.endswith(f".{self.domain}")
-                            and subdomain not in seen_domains
+                            and subdomain not in seen
                             and "*" not in subdomain
                         ):
-                            seen_domains.add(subdomain)
-                            found.append({
+                            seen.add(subdomain)
+                            results.append({
                                 "subdomain": subdomain,
                                 "source": "ct_logs",
                                 "issuer": entry.get("issuer_name", ""),
                                 "not_before": entry.get("not_before", ""),
                                 "not_after": entry.get("not_after", ""),
                             })
+        except Exception as e:
+            logger.debug(f"crt.sh CT search failed or timed out: {e}")
+        return results
 
-        except (requests.RequestException, ValueError) as e:
-            logger.warning(f"CT log search failed: {e}")
+    def _search_hackertarget(self) -> list[dict[str, Any]]:
+        """Search subdomains via HackerTarget HostSearch passive DNS feed."""
+        results: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        try:
+            resp = requests.get(
+                f"https://api.hackertarget.com/hostsearch/?q={self.domain}",
+                timeout=6.0,
+            )
+            if resp.status_code == 200 and "API count" not in resp.text and "error" not in resp.text.lower():
+                for line in resp.text.splitlines():
+                    line = line.strip()
+                    if not line or "," not in line:
+                        continue
+                    parts = line.split(",", 1)
+                    sub = parts[0].strip().lower()
+                    ip = parts[1].strip() if len(parts) > 1 else ""
+                    if (
+                        (sub == self.domain or sub.endswith(f".{self.domain}"))
+                        and sub not in seen
+                        and "*" not in sub
+                    ):
+                        seen.add(sub)
+                        entry: dict[str, Any] = {
+                            "subdomain": sub,
+                            "source": "passive_intel",
+                        }
+                        if ip and ip != "N/A":
+                            entry["ip"] = ip
+                        results.append(entry)
+        except Exception as e:
+            logger.debug(f"HackerTarget passive search failed or timed out: {e}")
+        return results
 
-        logger.info(f"Found [bold green]{len(found)}[/bold green] subdomains via CT logs")
+    def ct_search(self) -> list[dict[str, Any]]:
+        """
+        Search Certificate Transparency logs and passive OSINT feeds.
+
+        Returns:
+            List of unique subdomains found via passive intelligence.
+        """
+        logger.info(f"Searching passive feeds & CT logs for [bold magenta]{self.domain}[/bold magenta]")
+
+        found: list[dict[str, Any]] = []
+        seen_domains: set[str] = set()
+
+        # 1. Primary: crt.sh
+        crt_results = self._search_crtsh()
+        for r in crt_results:
+            sub = r["subdomain"]
+            if sub not in seen_domains:
+                seen_domains.add(sub)
+                found.append(r)
+
+        # 2. Secondary / Fallback: HackerTarget HostSearch
+        ht_results = self._search_hackertarget()
+        for r in ht_results:
+            sub = r["subdomain"]
+            if sub not in seen_domains:
+                seen_domains.add(sub)
+                found.append(r)
+            else:
+                # If already found in crt.sh but without an IP, enrich with HackerTarget IP
+                for f in found:
+                    if f["subdomain"] == sub and not f.get("ip") and r.get("ip"):
+                        f["ip"] = r["ip"]
+
+        # 3. Fast concurrent DNS IP resolution for subdomains that do not yet have an IP
+        unresolved = [f for f in found if not f.get("ip") or f.get("ip") == "N/A"]
+        if unresolved:
+            def _resolve_ip(entry: dict[str, Any]) -> None:
+                sub = entry["subdomain"]
+                try:
+                    socket.setdefaulttimeout(1.5)
+                    entry["ip"] = socket.gethostbyname(sub)
+                except Exception:
+                    entry["ip"] = "N/A"
+
+            with ThreadPoolExecutor(max_workers=min(len(unresolved), 25)) as executor:
+                list(executor.map(_resolve_ip, unresolved))
+
+        logger.info(f"Found [bold green]{len(found)}[/bold green] subdomains via passive intelligence")
         return found
 
     def find_all(self) -> list[dict[str, Any]]:
         """
-        Run all subdomain discovery techniques.
+        Run all subdomain discovery techniques (brute force + CT / passive OSINT).
 
         Returns:
-            Combined list of unique discovered subdomains.
+            Combined list of unique discovered subdomains with enriched IPs.
         """
         start = datetime.now()
 
@@ -298,15 +369,20 @@ class SubdomainFinder:
         ct_results = self.ct_search()
 
         # Merge and deduplicate
-        seen: set[str] = set()
-        combined: list[dict[str, Any]] = []
+        seen: dict[str, dict[str, Any]] = {}
 
         for result in brute_results + ct_results:
             sub = result["subdomain"]
             if sub not in seen:
-                seen.add(sub)
-                combined.append(result)
+                seen[sub] = dict(result)
+            else:
+                # If existing lacks IP and new has IP, update
+                if (not seen[sub].get("ip") or seen[sub].get("ip") == "N/A") and result.get("ip") and result.get("ip") != "N/A":
+                    seen[sub]["ip"] = result["ip"]
+                if result.get("status_code") and not seen[sub].get("status_code"):
+                    seen[sub]["status_code"] = result["status_code"]
 
+        combined = list(seen.values())
         combined.sort(key=lambda x: x["subdomain"])
 
         duration = (datetime.now() - start).total_seconds()

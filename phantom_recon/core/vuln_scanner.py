@@ -73,49 +73,49 @@ SECURITY_HEADERS = {
         "severity": "medium",
         "cvss": 5.3,
         "description": "HTTP Strict Transport Security (HSTS) header is missing, allowing protocol downgrade and SSL stripping attacks.",
-        "remediation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains; preload' to response headers.",
+        "remediation": "Nginx: add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always; | Apache: Header always set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\"",
     },
     "Content-Security-Policy": {
         "severity": "medium",
         "cvss": 6.1,
-        "description": "Content Security Policy (CSP) header is absent, increasing exposure to Cross-Site Scripting (XSS) and code injection.",
-        "remediation": "Configure a restrictive Content-Security-Policy header defining trusted script-src, style-src, and frame-ancestors.",
+        "description": "Content Security Policy (CSP) header is absent, increasing exposure to Cross-Site Scripting (XSS), script injection, and frame hijacking.",
+        "remediation": "Nginx: add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self';\" always; | Apache: Header always set Content-Security-Policy \"default-src 'self'; script-src 'self';\"",
     },
     "X-Content-Type-Options": {
         "severity": "low",
         "cvss": 4.3,
-        "description": "X-Content-Type-Options header is absent, allowing MIME-type sniffing by browsers.",
-        "remediation": "Add 'X-Content-Type-Options: nosniff' header.",
+        "description": "X-Content-Type-Options header is absent, allowing MIME-type sniffing by browsers and potentially executing uploaded media as scripts.",
+        "remediation": "Nginx: add_header X-Content-Type-Options \"nosniff\" always; | Apache: Header always set X-Content-Type-Options \"nosniff\"",
     },
     "X-Frame-Options": {
         "severity": "medium",
         "cvss": 5.4,
-        "description": "X-Frame-Options header is missing, enabling UI redressing and Clickjacking attacks.",
-        "remediation": "Add 'X-Frame-Options: DENY' or 'SAMEORIGIN' header, or specify 'frame-ancestors' in CSP.",
+        "description": "X-Frame-Options header is missing, allowing third-party sites to embed this page in invisible frames to orchestrate clickjacking attacks.",
+        "remediation": "Nginx: add_header X-Frame-Options \"SAMEORIGIN\" always; (or DENY) | Apache: Header always set X-Frame-Options \"SAMEORIGIN\"",
     },
     "Referrer-Policy": {
         "severity": "low",
         "cvss": 3.1,
-        "description": "Referrer-Policy header is absent, potentially leaking private tokens or URLs in HTTP Referer.",
-        "remediation": "Add 'Referrer-Policy: strict-origin-when-cross-origin' header.",
+        "description": "Referrer-Policy header is absent, potentially leaking private tokens or URLs in HTTP Referer headers when navigating external links.",
+        "remediation": "Nginx: add_header Referrer-Policy \"strict-origin-when-cross-origin\" always; | Apache: Header always set Referrer-Policy \"strict-origin-when-cross-origin\"",
     },
     "Permissions-Policy": {
         "severity": "low",
         "cvss": 3.1,
-        "description": "Permissions-Policy header is missing; browser hardware APIs (camera, mic, geolocation) are unrestricted.",
-        "remediation": "Add a restrictive Permissions-Policy header (e.g. camera=(), microphone=(), geolocation=()).",
+        "description": "Permissions-Policy header is missing; browser hardware APIs (camera, microphone, geolocation, payment) are unrestricted.",
+        "remediation": "Nginx: add_header Permissions-Policy \"camera=(), microphone=(), geolocation=(), payment=()\" always; | Apache: Header always set Permissions-Policy \"camera=(), microphone=(), geolocation=()\"",
     },
     "Cross-Origin-Opener-Policy": {
         "severity": "low",
         "cvss": 3.1,
         "description": "Cross-Origin-Opener-Policy (COOP) header is absent, allowing cross-origin window interaction and Spectre-based leaks.",
-        "remediation": "Add 'Cross-Origin-Opener-Policy: same-origin' header.",
+        "remediation": "Nginx: add_header Cross-Origin-Opener-Policy \"same-origin\" always; | Apache: Header always set Cross-Origin-Opener-Policy \"same-origin\"",
     },
     "Cross-Origin-Embedder-Policy": {
         "severity": "low",
         "cvss": 3.1,
         "description": "Cross-Origin-Embedder-Policy (COEP) header is absent, allowing unconstrained cross-origin resource embedding.",
-        "remediation": "Add 'Cross-Origin-Embedder-Policy: require-corp' header.",
+        "remediation": "Nginx: add_header Cross-Origin-Embedder-Policy \"require-corp\" always; | Apache: Header always set Cross-Origin-Embedder-Policy \"require-corp\"",
     },
 }
 
@@ -789,13 +789,20 @@ class VulnerabilityScanner:
                 title=f"Information Disclosure: Server Version ({server})",
                 severity="low",
                 cvss_score=3.7,
-                description=f"Server header discloses software and exact version number: '{server}'.",
+                description=(
+                    f"The HTTP response header discloses the web server software and granular version: 'Server: {server}'. "
+                    "Revealing exact software versions assists attackers in identifying version-specific CVEs, known unpatched flaws, "
+                    "and automated exploit payloads."
+                ),
                 location="HTTP Response Header: 'Server'",
                 url=self.url,
                 poc_url=self.url,
                 reproduce_curl=f"curl -I -k '{self.url}'",
                 evidence=f"Server: {server}",
-                remediation="Configure server to suppress version numbers (e.g., ServerTokens Prod in Apache, server_tokens off in Nginx).",
+                remediation=(
+                    "Nginx: add 'server_tokens off;' inside http block (/etc/nginx/nginx.conf) | "
+                    "Apache: set 'ServerTokens Prod' and 'ServerSignature Off' in httpd.conf"
+                ),
                 category="info_disclosure",
                 confidence="CONFIRMED",
             )
@@ -808,13 +815,21 @@ class VulnerabilityScanner:
                 title=f"Information Disclosure: Technology Stack ({powered_by})",
                 severity="low",
                 cvss_score=3.1,
-                description=f"X-Powered-By header discloses underlying backend framework: '{powered_by}'.",
+                description=(
+                    f"The 'X-Powered-By' header discloses the backend programming framework or runtime: '{powered_by}'. "
+                    "Disclosing backend runtime technology reduces attacker reconnaissance effort and provides targeting intelligence for framework exploits."
+                ),
                 location="HTTP Response Header: 'X-Powered-By'",
                 url=self.url,
                 poc_url=self.url,
                 reproduce_curl=f"curl -I -k '{self.url}'",
                 evidence=f"X-Powered-By: {powered_by}",
-                remediation="Disable or remove X-Powered-By header in web application settings.",
+                remediation=(
+                    "PHP: set 'expose_php = Off' in php.ini | "
+                    "Express.js: call 'app.disable(\"x-powered-by\");' | "
+                    "ASP.NET: remove X-Powered-By in web.config | "
+                    "Nginx: use 'proxy_hide_header X-Powered-By;'"
+                ),
                 category="info_disclosure",
                 confidence="CONFIRMED",
             )

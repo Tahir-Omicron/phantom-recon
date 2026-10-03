@@ -95,8 +95,14 @@ class HeaderAnalyzer:
             present=bool(hsts),
             value=hsts,
             secure=bool(hsts and "max-age" in hsts.lower()),
-            description="Enforces HTTPS connections." if hsts else "HSTS not set — downgrade attacks possible.",
-            recommendation="" if hsts else "Add: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
+            description=(
+                "Enforces encrypted HTTPS connections via HSTS." if hsts
+                else "HTTP Strict-Transport-Security (HSTS) is missing. Without HSTS, browsers can downgrade connections to plaintext HTTP, leaving sessions vulnerable to SSL stripping and MitM interception."
+            ),
+            recommendation=(
+                "" if hsts
+                else "Nginx: add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always; | Apache: Header always set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\""
+            ),
             severity="info" if hsts else "high",
         ))
 
@@ -107,8 +113,14 @@ class HeaderAnalyzer:
             present=bool(csp),
             value=csp[:200] + "..." if len(csp) > 200 else csp,
             secure=bool(csp and "unsafe-inline" not in csp and "unsafe-eval" not in csp),
-            description="CSP configured." if csp else "No CSP — higher risk of XSS.",
-            recommendation="" if csp else "Implement a strict Content-Security-Policy.",
+            description=(
+                "Content-Security-Policy (CSP) is actively enforced." if csp
+                else "Content-Security-Policy (CSP) header is absent. Without CSP, the browser executes unvetted scripts and frames, drastically elevating impact from Cross-Site Scripting (XSS) and code injection."
+            ),
+            recommendation=(
+                "" if csp
+                else "Nginx: add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self';\" always; | Apache: Header always set Content-Security-Policy \"default-src 'self'; script-src 'self';\""
+            ),
             severity="info" if (csp and "unsafe" not in csp) else "medium",
         ))
 
@@ -119,8 +131,14 @@ class HeaderAnalyzer:
             present=bool(xcto),
             value=xcto,
             secure=xcto.lower() == "nosniff",
-            description="MIME sniffing prevented." if xcto else "MIME sniffing not prevented.",
-            recommendation="" if xcto else "Add: X-Content-Type-Options: nosniff",
+            description=(
+                "MIME-sniffing prevention is enforced (nosniff)." if xcto
+                else "X-Content-Type-Options header is missing. Browsers may ignore declared MIME types and interpret uploaded non-executable files as executable HTML/JavaScript."
+            ),
+            recommendation=(
+                "" if xcto
+                else "Nginx: add_header X-Content-Type-Options \"nosniff\" always; | Apache: Header always set X-Content-Type-Options \"nosniff\""
+            ),
             severity="info" if xcto else "low",
         ))
 
@@ -131,8 +149,14 @@ class HeaderAnalyzer:
             present=bool(xfo),
             value=xfo,
             secure=xfo.upper() in ("DENY", "SAMEORIGIN"),
-            description="Clickjacking protection enabled." if xfo else "No clickjacking protection.",
-            recommendation="" if xfo else "Add: X-Frame-Options: DENY",
+            description=(
+                f"Clickjacking protection enabled ({xfo})." if xfo
+                else "X-Frame-Options header is absent. The web application can be framed inside external websites, enabling UI redressing and clickjacking attacks."
+            ),
+            recommendation=(
+                "" if xfo
+                else "Nginx: add_header X-Frame-Options \"SAMEORIGIN\" always; (or DENY) | Apache: Header always set X-Frame-Options \"SAMEORIGIN\""
+            ),
             severity="info" if xfo else "medium",
         ))
 
@@ -143,8 +167,14 @@ class HeaderAnalyzer:
             present=bool(xxp),
             value=xxp,
             secure="1" in xxp and "mode=block" in xxp,
-            description="XSS protection set." if xxp else "Browser XSS filter not configured.",
-            recommendation="" if xxp else "Add: X-XSS-Protection: 1; mode=block",
+            description=(
+                "Legacy XSS auditor filter configured." if xxp
+                else "X-XSS-Protection header is not configured for legacy browsers."
+            ),
+            recommendation=(
+                "" if xxp
+                else "Nginx: add_header X-XSS-Protection \"1; mode=block\" always; | Apache: Header always set X-XSS-Protection \"1; mode=block\""
+            ),
             severity="info" if xxp else "low",
         ))
 
@@ -155,8 +185,14 @@ class HeaderAnalyzer:
             present=bool(rp),
             value=rp,
             secure=bool(rp),
-            description=f"Referrer policy: {rp}" if rp else "No referrer policy set.",
-            recommendation="" if rp else "Add: Referrer-Policy: strict-origin-when-cross-origin",
+            description=(
+                f"Referrer-Policy enforced: {rp}" if rp
+                else "Referrer-Policy is missing. Browsers may leak private endpoint query strings, reset tokens, or confidential path URLs in outgoing HTTP Referer headers."
+            ),
+            recommendation=(
+                "" if rp
+                else "Nginx: add_header Referrer-Policy \"strict-origin-when-cross-origin\" always; | Apache: Header always set Referrer-Policy \"strict-origin-when-cross-origin\""
+            ),
             severity="info" if rp else "low",
         ))
 
@@ -167,8 +203,14 @@ class HeaderAnalyzer:
             present=bool(pp),
             value=pp[:200] + "..." if len(pp) > 200 else pp,
             secure=bool(pp),
-            description="Permissions policy configured." if pp else "No permissions policy.",
-            recommendation="" if pp else "Add a Permissions-Policy to restrict browser features.",
+            description=(
+                "Permissions-Policy configured to restrict browser APIs." if pp
+                else "Permissions-Policy header is absent. Browser hardware APIs (camera, microphone, geolocation, payment) are not explicitly restricted."
+            ),
+            recommendation=(
+                "" if pp
+                else "Nginx: add_header Permissions-Policy \"camera=(), microphone=(), geolocation=(), payment=()\" always; | Apache: Header always set Permissions-Policy \"camera=(), microphone=(), geolocation=()\""
+            ),
             severity="info" if pp else "low",
         ))
 
@@ -180,8 +222,14 @@ class HeaderAnalyzer:
             present=bool(server),
             value=server,
             secure=not has_version,
-            description=f"Server: {server}" + (" (version exposed)" if has_version else ""),
-            recommendation="Remove version info from Server header." if has_version else "",
+            description=(
+                f"Server header exposes exact software version ({server}), assisting automated exploit search."
+                if has_version else f"Server banner: {server or 'Not exposed (secure)'}"
+            ),
+            recommendation=(
+                "Nginx: add 'server_tokens off;' in http block (/etc/nginx/nginx.conf) | Apache: set 'ServerTokens Prod' and 'ServerSignature Off' in httpd.conf"
+                if has_version else ""
+            ),
             severity="low" if has_version else "info",
         ))
 
@@ -192,8 +240,14 @@ class HeaderAnalyzer:
             present=bool(xpb),
             value=xpb,
             secure=not bool(xpb),
-            description=f"Technology exposed: {xpb}" if xpb else "X-Powered-By not present (good).",
-            recommendation="Remove the X-Powered-By header." if xpb else "",
+            description=(
+                f"X-Powered-By header exposes backend application runtime: {xpb}."
+                if xpb else "X-Powered-By not present (good security posture)."
+            ),
+            recommendation=(
+                "PHP: expose_php = Off in php.ini | Express: app.disable('x-powered-by'); | Nginx: proxy_hide_header X-Powered-By;"
+                if xpb else ""
+            ),
             severity="low" if xpb else "info",
         ))
 

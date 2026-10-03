@@ -118,10 +118,17 @@ class PolicyAuditor:
                     category="Policy & Compliance",
                     location=candidates[0],
                     description=(
-                        "The web application does not publish a security.txt file at '/.well-known/security.txt'. "
-                        "RFC 9116 standardizes how security researchers and incident response teams report vulnerabilities."
+                        f"The web application does not publish a standardized vulnerability disclosure policy at '{candidates[0]}'. "
+                        "RFC 9116 defines the established internet standard for ethical security researchers and CSIRT/CERT "
+                        "teams to responsibly disclose critical security flaws directly to organizational engineers."
                     ),
-                    remediation="Publish an RFC 9116 compliant security.txt at '/.well-known/security.txt' with Contact and Expires fields.",
+                    remediation=(
+                        f"Create a UTF-8 text file at '/.well-known/security.txt' with the following template:\n"
+                        f"Contact: mailto:security@{urlparse(self.base_url).hostname or 'example.com'}\n"
+                        f"Expires: 2027-12-31T23:59:59.000Z\n"
+                        f"Preferred-Languages: az, en\n"
+                        f"Canonical: {candidates[0]}"
+                    ),
                     evidence="HTTP 404/not found at standard security.txt locations.",
                     poc_url=candidates[0],
                 ),

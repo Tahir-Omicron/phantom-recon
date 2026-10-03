@@ -246,10 +246,17 @@ class AutonomousAuditor:
                         category="DNS / Email Security",
                         location=f"_dmarc.{self.host}",
                         description=(
-                            f"The domain '{self.host}' lacks a published DMARC DNS record. Attackers can forge "
-                            "phishing emails masquerading as legitimate organizational correspondence."
+                            f"The domain '{self.host}' lacks a published DMARC (Domain-based Message Authentication, "
+                            "Reporting, and Conformance) DNS policy. Without DMARC, receiving mail exchange (MX) servers "
+                            "have no directives to reject spoofed messages, allowing attackers to conduct CEO fraud, "
+                            "business email compromise (BEC), and phishing campaigns masquerading as this organization."
                         ),
-                        remediation=f"Publish a DMARC TXT record at '_dmarc.{self.host}' (e.g. 'v=DMARC1; p=reject; rua=mailto:dmarc-reports@{self.host}').",
+                        remediation=(
+                            f"1. Publish an initial monitoring DMARC TXT record at '_dmarc.{self.host}':\n"
+                            f"   'v=DMARC1; p=none; rua=mailto:dmarc-reports@{self.host}; aspf=r;'\n"
+                            f"2. Validate legitimate sender alignment across SPF and DKIM.\n"
+                            f"3. Escalate policy to quarantine ('p=quarantine') and ultimately enforcement ('p=reject')."
+                        ),
                         evidence="No TXT record found at _dmarc." + self.host,
                         poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a{self.host}",
                         reproduce_curl=f"nslookup -type=TXT _dmarc.{self.host}",
@@ -263,10 +270,14 @@ class AutonomousAuditor:
                         category="DNS / Email Security",
                         location=f"DNS TXT: {self.host}",
                         description=(
-                            f"The domain '{self.host}' does not publish an SPF (Sender Policy Framework) record, "
-                            "permitting unauthorized mail servers to dispatch emails claiming to originate from this domain."
+                            f"The domain '{self.host}' does not publish an SPF (Sender Policy Framework) TXT record. "
+                            "External mail transfer agents (MTAs) cannot verify which mail servers are legitimately "
+                            "authorized to send emails on behalf of this domain, permitting unauthorized sender spoofing."
                         ),
-                        remediation=f"Publish an SPF TXT record on {self.host} (e.g. 'v=spf1 mx include:_spf.example.com -all').",
+                        remediation=(
+                            f"Publish an SPF TXT record on {self.host} authorizing legitimate outbound mail infrastructure "
+                            f"(e.g. 'v=spf1 mx include:_spf.google.com -all' or 'v=spf1 -all' if this domain does not transmit email)."
+                        ),
                         evidence="No TXT record with 'v=spf1' located.",
                         poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=spf%3a{self.host}",
                         reproduce_curl=f"nslookup -type=TXT {self.host}",
@@ -295,8 +306,16 @@ class AutonomousAuditor:
             try:
                 from phantom_recon.core.takeover import SubdomainTakeoverAuditor
                 takeover_candidates = [self.host]
-                if "subdomains" in self.scan_data and isinstance(self.scan_data["subdomains"], dict):
-                    takeover_candidates.extend(self.scan_data["subdomains"].get("subdomains", []))
+                subs_data = self.scan_data.get("subdomains", [])
+                if isinstance(subs_data, list):
+                    for s in subs_data:
+                        if isinstance(s, dict) and "subdomain" in s:
+                            takeover_candidates.append(s["subdomain"])
+                        elif isinstance(s, str):
+                            takeover_candidates.append(s)
+                elif isinstance(subs_data, dict):
+                    takeover_candidates.extend(subs_data.get("subdomains", []))
+
                 takeover_candidates = list(dict.fromkeys(takeover_candidates))
                 if self.fast_mode:
                     takeover_candidates = takeover_candidates[:20]
@@ -546,6 +565,7 @@ class AutonomousAuditor:
                             remediation=chk.get("recommendation", "Implement standard defense header in reverse proxy or web server configuration."),
                             evidence=f"Header '{chk.get('header')}' was not returned.",
                             poc_url=self.url,
+                            reproduce_curl=f"curl -I -k '{self.url}'",
                         ))
             except Exception as e:
                 logger.debug(f"Stage 11 error: {e}")
@@ -572,6 +592,7 @@ class AutonomousAuditor:
                         remediation=pf.get("remediation", ""),
                         evidence=pf.get("evidence", ""),
                         poc_url=pf.get("poc_url", self.url),
+                        reproduce_curl=f"curl -i -k '{pf.get('poc_url', self.url)}'",
                     ))
             except Exception as e:
                 logger.debug(f"Stage 12 error: {e}")
