@@ -156,8 +156,20 @@ def print_command_palette() -> None:
         "phantom whois -t site.com",
         "Domain registration, expiration dates, registrar, and nameservers."
     )
+    table.add_row(
+        "🌐 Surface Recon",
+        "asn",
+        "phantom asn site.com",
+        "Autonomous BGP route, ASN (Team Cymru/RDAP), ISP, and GeoIP reconnaissance."
+    )
 
     # Category: Vulnerability & Defense
+    table.add_row(
+        "🛡️ Vuln & Defense",
+        "endpoints",
+        "phantom endpoints https://site.com",
+        "Client-side JS bundle static analysis, API route mining & sensitive path probing."
+    )
     table.add_row(
         "🛡️ Vuln & Defense",
         "takeover",
@@ -433,6 +445,8 @@ def format_poc_command(v: dict, fallback_target: str = "") -> str:
 
     c_cmd = (v.get("reproduce_curl") or "").strip()
     if c_cmd and not c_cmd.startswith("curl -i -k 'DNS:") and not c_cmd.startswith("curl -i -k '_dmarc.") and "mxtoolbox.com" not in c_cmd:
+        if " | grep" in c_cmd:
+            c_cmd = c_cmd.split(" | grep")[0].strip()
         return c_cmd
 
     poc_url = (v.get("poc_url") or "").strip()

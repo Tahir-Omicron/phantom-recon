@@ -251,6 +251,22 @@ class HeaderAnalyzer:
             severity="low" if xpb else "info",
         ))
 
+        # ── Alt-Svc (HTTP/3 & QUIC Modern Transport) ──
+        alt_svc = headers.get("Alt-Svc", "")
+        has_h3 = bool(alt_svc and ("h3" in alt_svc or "quic" in alt_svc))
+        self._checks.append(HeaderCheck(
+            header="Alt-Svc",
+            present=bool(alt_svc),
+            value=alt_svc[:120] + "..." if len(alt_svc) > 120 else alt_svc,
+            secure=True,
+            description=(
+                f"Modern HTTP/3 (QUIC) transport advertised via Alt-Svc: {alt_svc[:50]}..."
+                if has_h3 else "Alt-Svc header indicates standard HTTP transport."
+            ),
+            recommendation="",
+            severity="info",
+        ))
+
         # ── Calculate grade ──
         self._grade = self._calculate_grade()
 

@@ -226,15 +226,28 @@ class AutonomousAuditor:
         """
         start_time = datetime.now()
 
-        # ─── Stage 1: WHOIS & Domain Intelligence ─────────────────────
-        self._notify(1, "WHOIS Lookup & Registration Intelligence")
+        # ─── Stage 1: WHOIS & Autonomous BGP / ASN Network Intelligence ───
+        self._notify(1, "WHOIS & Autonomous BGP / ASN Network Intelligence")
+        if self.target_type in ("domain", "url", "ip"):
+            try:
+                from phantom_recon.core.network_intel import NetworkIntelligence
+                net_intel = NetworkIntelligence(target=self.host, timeout=self.timeout).analyze()
+                self.scan_data["network_intel"] = net_intel.to_dict()
+                if net_intel.asn:
+                    logger.info(
+                        f"Network Intel: [bold cyan]{net_intel.asn}[/bold cyan] ({net_intel.as_name}) | "
+                        f"Prefix: {net_intel.bgp_prefix} | Country: {net_intel.country}"
+                    )
+            except Exception as e:
+                logger.debug(f"Stage 1 Network Intel error: {e}")
+
         if self.target_type in ("domain", "url"):
             try:
                 from phantom_recon.core.whois_lookup import WhoisLookup
                 whois_data = WhoisLookup(target=self.host, timeout=self.timeout).lookup()
                 self.scan_data["whois"] = whois_data
             except Exception as e:
-                logger.debug(f"Stage 1 error: {e}")
+                logger.debug(f"Stage 1 WHOIS error: {e}")
 
         # ─── Stage 2: DNS & Email Spoofing Defense ────────────────────
         self._notify(2, "DNS Enumeration & Anti-Spoofing Policy Audit")
@@ -410,7 +423,7 @@ class AutonomousAuditor:
                     poc_url=f"http://{unprot[0]['ip']}" if unprot else self.url,
                 ))
         except Exception as e:
-            logger.debug(f"Stage 4 error: {e}")
+            logger.debug(f"Stage 5 error: {e}")
 
         # ─── Stage 6: Multi-Cloud Bucket Storage Audit ─────────────────
         self._notify(6, "Multi-Cloud Storage & Bucket Leakage Audit (AWS/GCP/Azure)")
@@ -523,8 +536,8 @@ class AutonomousAuditor:
         else:
             logger.info(f"Target '{self.host}' has no active HTTP/HTTPS service. Skipping web app recon.")
 
-        # ─── Stage 9: API Discovery & Schema Auditing ───────────────────
-        self._notify(9, "API Discovery, Swagger/OpenAPI & GraphQL Auditing")
+        # ─── Stage 9: API Discovery, Swagger/OpenAPI, GraphQL & JS Route Extraction ───
+        self._notify(9, "API Discovery, Swagger/OpenAPI, GraphQL & JS Route Extraction")
         if web_active:
             try:
                 from phantom_recon.core.api_scanner import APIScanner
@@ -545,6 +558,36 @@ class AutonomousAuditor:
                             remediation="Place API schemas and interactive consoles behind authentication in production environments.",
                             evidence=api.get("evidence", ""),
                             poc_url=api.get("url", self.url),
+                        ))
+
+                # Client-Side JavaScript Route & API Endpoint Extraction
+                from phantom_recon.core.js_miner import JSEndpointExtractor
+                js_extractor = JSEndpointExtractor(
+                    url=self.url,
+                    timeout=self.timeout,
+                    max_scripts=6 if self.fast_mode else 12,
+                    verify_ssl=self.verify_ssl,
+                    probe_endpoints=not self.fast_mode,
+                )
+                js_results = js_extractor.extract()
+                self.scan_data["js_endpoints"] = js_results.to_dict()
+
+                for probe in js_results.probed_findings:
+                    if probe.get("is_exposed"):
+                        self._add_finding(AuditFinding(
+                            title=f"Exposed Client-Side Sensitive Route ({probe['path']})",
+                            severity="medium",
+                            cvss_score=5.3,
+                            category="API / Attack Surface",
+                            location=probe.get("url", self.url),
+                            description=(
+                                f"Client-side JavaScript references sensitive endpoint '{probe['path']}' "
+                                "which responds with HTTP 200 OK without requiring authentication."
+                            ),
+                            remediation="Enforce strict authentication and authorization checks on all internal and administrative endpoints.",
+                            evidence=f"Endpoint: {probe['url']} returned HTTP 200 OK.",
+                            poc_url=probe.get("url", self.url),
+                            reproduce_curl=f"curl -i -k '{probe.get('url', self.url)}'",
                         ))
             except Exception as e:
                 logger.debug(f"Stage 9 error: {e}")

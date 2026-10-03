@@ -1095,6 +1095,110 @@ def _execute_autonomous_audit(
     info(f"Strukturlaşdırılmış JSON məlumatı saxlanıldı: [bold]{json_path}[/bold]")
 
 
+# ─── Autonomous ASN & BGP Network Intelligence ─────────────────
+@main.command("asn")
+@click.argument("target_arg", required=False)
+@click.option("--target", "-t", default=None, help="Target domain, IP, or URL.")
+@click.option("--timeout", default=6.0, help="Query timeout in seconds.")
+@click.pass_context
+def asn_cmd(ctx, target_arg, target, timeout):
+    """🌐 Autonomous ASN & BGP network routing reconnaissance (Team Cymru/RDAP)."""
+    resolved_target = target_arg or target
+    if not resolved_target:
+        error("Target domain or IP address is required (e.g. phantom asn example.com).")
+        return
+
+    print_banner()
+    section_header(f"BGP & Network Intelligence — {resolved_target}")
+
+    from phantom_recon.core.network_intel import NetworkIntelligence
+    net_intel = NetworkIntelligence(target=resolved_target, timeout=timeout).analyze()
+
+    rows = [
+        ["Target Host", net_intel.hostname],
+        ["Resolved IP", net_intel.ip or "Unresolved"],
+        ["Reverse DNS (PTR)", net_intel.ptr or "None"],
+        ["ASN Number", net_intel.asn or "N/A"],
+        ["AS Organization", net_intel.as_name or "N/A"],
+        ["BGP CIDR Prefix", net_intel.bgp_prefix or "N/A"],
+        ["Registry (RIR)", net_intel.rir or "N/A"],
+        ["Country / Region", f"{net_intel.country} ({net_intel.city or 'N/A'})"],
+        ["ISP / Provider", net_intel.isp or "N/A"],
+        ["Cloud / CDN Classified", f"{net_intel.cloud_provider}" if net_intel.is_cloud else "No (Dedicated/Direct IP)"],
+    ]
+    print_results_table(
+        f"Network Routing & Autonomous System Profile — {resolved_target}",
+        [("Property", "bold cyan"), ("Value", "white")],
+        rows,
+    )
+
+    _save_output(ctx, net_intel.to_dict())
+
+
+# ─── Client-Side JS API Route & Endpoint Extractor ─────────────
+@main.command("endpoints")
+@click.argument("url_arg", required=False)
+@click.option("--url", "-u", default=None, help="Target application URL.")
+@click.option("--timeout", default=6.0, help="Per-request timeout in seconds.")
+@click.option("--max-scripts", default=12, help="Maximum JS bundles to analyze.")
+@click.option("--probe", is_flag=True, help="Non-intrusively probe sensitive routes for 200 OK.")
+@click.pass_context
+def endpoints_cmd(ctx, url_arg, url, timeout, max_scripts, probe):
+    """⚡ Client-side JS API route mining & sensitive path extractor."""
+    resolved_url = url_arg or url
+    if not resolved_url:
+        error("Target URL is required (e.g. phantom endpoints https://example.com).")
+        return
+
+    print_banner()
+    section_header(f"JavaScript Route & Endpoint Discovery — {resolved_url}")
+
+    from phantom_recon.core.js_miner import JSEndpointExtractor
+    extractor = JSEndpointExtractor(
+        url=resolved_url,
+        timeout=timeout,
+        max_scripts=max_scripts,
+        probe_endpoints=probe,
+    )
+    result = extractor.extract()
+
+    info(f"Scripts analyzed: [bold cyan]{result.scripts_analyzed}[/bold cyan] | Total unique routes: [bold green]{len(result.all_endpoints)}[/bold green]")
+
+    if result.api_routes:
+        rows = [[r] for r in result.api_routes[:40]]
+        print_results_table(
+            f"Discovered REST & API Routes ({len(result.api_routes)})",
+            [("API Endpoint Path", "bold green")],
+            rows,
+        )
+
+    if result.sensitive_endpoints:
+        rows = [[r] for r in result.sensitive_endpoints[:30]]
+        print_results_table(
+            f"Sensitive / Administrative Candidates ({len(result.sensitive_endpoints)})",
+            [("Sensitive Route", "bold yellow")],
+            rows,
+        )
+
+    if result.cloud_assets:
+        rows = [[c] for c in result.cloud_assets[:20]]
+        print_results_table(
+            f"Referenced Cloud Storage & S3 Assets ({len(result.cloud_assets)})",
+            [("Cloud URL", "bold cyan")],
+            rows,
+        )
+
+    if result.probed_findings:
+        rows = [[p["path"], str(p["status_code"]), "EXPOSED (200 OK)" if p["is_exposed"] else "Restricted"] for p in result.probed_findings]
+        print_results_table(
+            f"Probed Sensitive Endpoints ({len(result.probed_findings)})",
+            [("Path", "bold"), ("Status", "cyan"), ("Posture", "bold red")],
+            rows,
+        )
+
+    _save_output(ctx, result.to_dict())
+
+
 # ─── Master Autonomous Audit (Single Command Start-to-Finish) ───
 @main.command(name="audit")
 @click.argument("target_arg", required=False)

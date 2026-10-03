@@ -5,20 +5,21 @@
 <h1 align="center">🔥 Phantom Recon</h1>
 
 <p align="center">
-  <strong>Next-Generation Autonomous Penetration Testing & Reconnaissance Framework (v2.1.0)</strong><br>
+  <strong>Next-Generation Autonomous Penetration Testing & Reconnaissance Framework (v2.3.0)</strong><br>
   <em>One command. 15 automated audit stages. Zero false positives. Ready-to-use PoC verification.</em>
 </p>
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="MIT License"/></a>
-  <a href="#modules"><img src="https://img.shields.io/badge/modules-20+-red.svg?style=for-the-badge" alt="20+ Modules"/></a>
-  <a href="#testing"><img src="https://img.shields.io/badge/tests-181%20passed-brightgreen.svg?style=for-the-badge" alt="181 Tests Passing"/></a>
+  <a href="#modules"><img src="https://img.shields.io/badge/modules-22+-red.svg?style=for-the-badge" alt="22+ Modules"/></a>
+  <a href="#testing"><img src="https://img.shields.io/badge/tests-216%20passed-brightgreen.svg?style=for-the-badge" alt="216 Tests Passing"/></a>
   <a href="#features"><img src="https://img.shields.io/badge/false--positives-ZERO-orange.svg?style=for-the-badge" alt="Zero False Positives"/></a>
 </p>
 
 <p align="center">
   <a href="#-quick-start">Quick Start</a> •
+  <a href="#-azərbaycan-dili--istifadə-təlimatı">İstifadə (AZ)</a> •
   <a href="#-why-phantom-recon">Why Phantom Recon</a> •
   <a href="#-key-features">Key Features</a> •
   <a href="#-cli-command-cheatsheet">Command Cheatsheet</a> •
@@ -39,11 +40,34 @@ git clone https://github.com/Tahir-Omicron/phantom-recon.git
 cd phantom-recon
 pip install -e .
 
-# 2. Run master autonomous audit (Terminal Table + Security Scorecard + PoC cURLs)
+# 2. Run master autonomous audit (Terminal Table + Security Scorecard + PoC Commands)
 phantom audit example.com
 
 # 3. Fast mode or export to Dark Glassmorphism HTML dashboard
 phantom audit example.com --fast --output report.html
+```
+
+---
+
+## 🇦🇿 Azərbaycan Dili — Quraşdırma və İstifadə Təlimatı
+
+Phantom Recon alətini PowerShell və ya Terminal-da rahat işə salmaq üçün addımlar:
+
+```powershell
+# 1. Qovluğa daxil olun və kitabxananı sistemə quraşdırın
+pip install -e .
+
+# 2. İstənilən domen və ya saytı 15 mərhələli avtonom auditlə yoxlayın:
+phantom audit example.com --fast
+
+# 3. Şəbəkə, BGP və ASN infrastrukturunu analiz edin:
+phantom asn example.com
+
+# 4. Saytın JavaScript kodundan gizli API və daxili marşrutları çıxarın:
+phantom endpoints https://example.com
+
+# 5. Yalnız zəiflikləri və təhlükəsizlik başlıqlarını skan edin:
+phantom vuln -u https://example.com
 ```
 
 ---
@@ -55,11 +79,13 @@ Most security professionals spend hours running disparate CLI tools (subfinder, 
 | Capability | Phantom Recon | Nuclei | Subfinder | httpx | Nmap |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **All-in-One Autonomous Master Pipeline** | ✅ **15 Stages** | ❌ (Vuln only) | ❌ (DNS only) | ❌ (HTTP only) | ❌ (Port only) |
+| **Autonomous ASN & BGP Network Intel** | ✅ **Team Cymru / RFC** | ❌ | ❌ | ❌ | ⚠️ (Nmap NSE) |
+| **Client JS Route & API Endpoint Miner**| ✅ **LinkFinder Style** | ⚠️ Templates | ❌ | ❌ | ❌ |
 | **Zero False Positive Engine** | ✅ **Canary Profiling** | ⚠️ Partial | N/A | N/A | N/A |
 | **Bogon / Unroutable IP Filtering** | ✅ **RFC Compliant** | ❌ | ❌ | ❌ | ❌ |
 | **Cloud Bucket Target-Match Guard** | ✅ **High-Confidence** | ❌ | N/A | N/A | N/A |
 | **Direct Terminal Vulnerability Matrix** | ✅ **Built-in Rich** | ❌ (Raw text) | ❌ | ❌ | ❌ |
-| **Direct Copy-Paste PoC cURLs** | ✅ **1-Click / Terminal** | ⚠️ Partial | ❌ | ❌ | ❌ |
+| **Direct Copy-Paste PoC Commands** | ✅ **Cross-Platform** | ⚠️ Partial | ❌ | ❌ | ❌ |
 | **Executive Security Health Scorecard** | ✅ **0–100 (A+ to F)** | ❌ | ❌ | ❌ | ❌ |
 | **Subdomain Takeover (17 Providers)** | ✅ **Native** | ⚠️ Templates | ❌ | ❌ | ❌ |
 | **Pure-Python MMH3 Favicon Hasher** | ✅ **Shodan Compatible** | ❌ | ❌ | ✅ (Via Go) | ❌ |
@@ -73,13 +99,19 @@ Most security professionals spend hours running disparate CLI tools (subfinder, 
 - 🎯 **Single-Command Master Audit (`phantom audit <target>`)**:
   - Automatically parses domains, URLs, and IP subnets.
   - Sequentially executes 15 specialized inspection stages and prints a unified findings matrix directly in your terminal.
+- 🌐 **Autonomous ASN & BGP Network Intelligence (`phantom asn`)**:
+  - Performs RFC-standard Team Cymru DNS & RDAP routing reconnaissance.
+  - Resolves target IP, PTR reverse DNS, ASN number (e.g. `AS15169`), AS Organization, BGP CIDR route, RIR registry, country, and cloud provider classification.
+- ⚡ **Client-Side JS Route & API Endpoint Extractor (`phantom endpoints`)**:
+  - Performs static AST/regex analysis on client-side JavaScript bundles and inline scripts.
+  - Automatically mines hidden REST API routes (`/api/v1/...`), GraphQL schemas, cloud storage URLs, and administrative candidate endpoints.
 - 🔬 **Guaranteed Zero-False-Positive Precision**:
   - **Soft-404 Canary Profiling**: Employs baseline fingerprinting so SPAs (Single Page Applications) returning HTTP 200 for missing pages do not trigger false alerts.
   - **Bogon & Unroutable IP Filtering**: Automatically rejects `0.0.0.0`, loopbacks, private RFC 1918 subnets, and link-local addresses when detecting unproxied backend origin servers.
   - **High-Confidence Cloud Matching**: Permutates and verifies AWS S3, GCP Storage, and Azure Blob containers strictly tied to the verified target domain, eliminating random third-party bucket collisions.
 - 💻 **Pentester-First UX & Actionable PoCs**:
   - Findings table displays exact affected locations, technical impact, and remediation steps.
-  - Instant **Actionable PoC cURLs** section provides copy-paste verification commands for immediate proof of concept.
+  - Instant **Actionable PoC Commands** section provides copy-paste verification commands (`nslookup` for DNS/DMARC/DNSSEC, `curl` for HTTP) for immediate proof of concept without syntax errors on Windows or Linux.
 - 🎨 **Pure-Python Favicon MMH3 Fingerprinting (`phantom favicon`)**:
   - 32-bit signed MurmurHash3 engine generating bit-for-bit identical hashes to Shodan `http.favicon.hash:<hash>` without requiring native C-extensions or compilation.
 - 🚨 **Subdomain Takeover & Dangling DNS Engine (`phantom takeover`)**:
@@ -103,6 +135,7 @@ Most security professionals spend hours running disparate CLI tools (subfinder, 
 ### 🔍 Attack Surface & Web Vulnerabilities
 | Command | Example | Description |
 | :--- | :--- | :--- |
+| `phantom endpoints` | `phantom endpoints https://example.com` | **Client-side JS bundle static analysis, API route mining & sensitive path probing.** |
 | `phantom vuln` | `phantom vuln -u https://example.com` | Precision web vulnerability audit (XSS, CORS, Secrets, Sensitive Files, Headers). |
 | `phantom takeover` | `phantom takeover example.com` | Subdomain takeover & dangling CNAME pointer audit across 17 cloud providers. |
 | `phantom waf` | `phantom waf -t example.com` | Cloud WAF/CDN detector (10 vendors) & unproxied origin IP leakage audit. |
@@ -116,10 +149,11 @@ Most security professionals spend hours running disparate CLI tools (subfinder, 
 ### 📡 Reconnaissance, Network & Auth
 | Command | Example | Description |
 | :--- | :--- | :--- |
+| `phantom asn` | `phantom asn example.com` | **Autonomous BGP route, ASN (Team Cymru/RDAP), ISP, and GeoIP reconnaissance.** |
 | `phantom scan` | `phantom scan -t 192.168.1.1 -p 1-1000` | Multi-threaded TCP/UDP port scanner with banner grabbing & WAF notice. |
 | `phantom subdomain` | `phantom subdomain -d example.com --ct-logs` | Subdomain finder via DNS brute force & Certificate Transparency logs. |
-| `phantom dns` | `phantom dns -d example.com -t all` | DNS record lookup, SPF/DMARC anti-spoofing policies & zone transfer test. |
-| `phantom ssl` | `phantom ssl -h example.com` | SSL/TLS protocol inspection, cipher suites & DER binary cert parser. |
+| `phantom dns` | `phantom dns -d example.com -t all` | DNS record lookup, DNSSEC, SPF/DMARC anti-spoofing policies & zone transfers. |
+| `phantom ssl` | `phantom ssl -h example.com` | SSL/TLS protocol inspection, ALPN HTTP/2 detection, ciphers & cert parser. |
 | `phantom network` | `phantom network -t 192.168.1.0/24` | Local CIDR subnet live host discovery (ping sweep) & route traceroute. |
 | `phantom brute` | `phantom brute -t host -s ssh -u usr.txt` | Rate-limited credential verification for SSH, FTP, and HTTP Basic. |
 | `phantom whois` | `phantom whois -t example.com` | Domain registrar, nameservers, and IP allocation intelligence. |
@@ -133,7 +167,7 @@ Phantom Recon generates clean, professional deliverables tailored for every stak
 1. **Interactive Dark Glassmorphism HTML Dashboard**:
    - Modern cybersecurity aesthetic with dynamic SVG Security Health Score gauge.
    - Synchronized live search and instant severity filtering (`Critical`, `High`, `Medium`, `Low`, `Info`).
-   - 1-Click copyable PoC cURL reproduction buttons with animated toast alerts.
+   - 1-Click copyable PoC reproduction buttons with animated toast alerts.
    - In-browser **Export CSV**, **Export JSON**, and Print/PDF support.
 2. **Excel-Ready CSV Report**:
    - Encoded in `UTF-8 with BOM` (`utf-8-sig`) for native display in Microsoft Excel, Google Sheets, Jira, and DefectDojo.
@@ -149,26 +183,8 @@ Phantom Recon generates clean, professional deliverables tailored for every stak
 Phantom Recon is backed by an automated test suite guaranteeing stability, accurate regex profiling, and reliable network parsing:
 
 ```bash
-pytest tests/ -v
-```
-
-```
-============================= test session starts =============================
-platform win32 -- Python 3.12.10, pytest-9.1.1
-collected 181 items
-
-tests/test_scanner.py .............                                      [  7%]
-tests/test_v160_features.py .........                                    [ 12%]
-tests/test_v170_features.py ..............                                [ 20%]
-tests/test_v180_features.py ..................                            [ 30%]
-tests/test_v190_features.py .................                             [ 39%]
-tests/test_v200_features.py .................                             [ 49%]
-tests/test_v210_features.py ......................                        [ 61%]
-tests/test_validators.py ..............................                  [ 78%]
-tests/test_vuln_scanner.py ..........................                    [ 92%]
-tests/test_waf_detector.py ..............                                [100%]
-
-============================= 181 passed in 5.42s =============================
+pytest -q
+# 216 passed
 ```
 
 ---

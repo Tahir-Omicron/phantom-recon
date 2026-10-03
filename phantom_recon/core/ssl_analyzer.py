@@ -80,6 +80,10 @@ class SSLAnalyzer:
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
+            try:
+                context.set_alpn_protocols(["h2", "http/1.1"])
+            except Exception:
+                pass
 
             conn = context.wrap_socket(
                 socket.socket(socket.AF_INET, socket.SOCK_STREAM),
@@ -94,7 +98,15 @@ class SSLAnalyzer:
             protocol = conn.version()
             cipher = conn.cipher()
 
+            alpn = ""
+            try:
+                alpn = conn.selected_alpn_protocol() or ""
+            except Exception:
+                pass
+
             results["protocol"] = protocol or ""
+            results["alpn_protocol"] = alpn
+            results["http2_supported"] = alpn == "h2"
             results["cipher_suite"] = cipher[0] if cipher else ""
             results["cipher_bits"] = cipher[2] if cipher and len(cipher) > 2 else 0
 
