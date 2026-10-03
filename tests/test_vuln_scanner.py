@@ -172,7 +172,11 @@ class TestZeroFalsePositiveGuards:
             resp = MagicMock()
             resp.status_code = 200
             resp.headers = {"Content-Type": "application/json"}
-            resp.text = '{"query": "phantom<xss\'probe\\"789>"}'
+            decoded_url = unquote(url)
+            import re
+            m = re.search(r"(phntm\w*<xss'probe\"789>|phantom\w*<xss'probe\"789>)", decoded_url)
+            probe = m.group(1) if m else "phantom<xss'probe\"789>"
+            resp.text = f'{{"query": "{probe}"}}'
             return resp
 
         mock_get.side_effect = mock_request
@@ -186,15 +190,16 @@ class TestZeroFalsePositiveGuards:
     @patch("requests.Session.get")
     def test_xss_confirmed_in_html_context(self, mock_get):
         """Unescaped reflection in text/html context must be flagged and confirmed."""
-        canary = "phantom<xss'probe\"789>"
-
         def mock_request(url, **kwargs):
             resp = MagicMock()
             resp.status_code = 200
             resp.headers = {"Content-Type": "text/html; charset=utf-8"}
             decoded_url = unquote(url)
-            if canary in decoded_url:
-                resp.text = f"<div>Search results for: {canary}</div>"
+            import re
+            m = re.search(r"(phntm\w*<xss'probe\"789>|phantom\w*<xss'probe\"789>)", decoded_url)
+            if m:
+                probe = m.group(1)
+                resp.text = f"<div>Search results for: {probe}</div>"
             else:
                 resp.text = "<div>Normal</div>"
             return resp

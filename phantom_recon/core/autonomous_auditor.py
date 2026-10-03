@@ -285,6 +285,27 @@ class AutonomousAuditor:
                         poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a{self.host}",
                         reproduce_curl=f"nslookup -type=TXT _dmarc.{self.host}",
                     ))
+                elif dmarc.get("policy") == "none":
+                    self._add_finding(AuditFinding(
+                        title="Weak DMARC Anti-Spoofing Policy (p=none)",
+                        severity="medium",
+                        cvss_score=4.8,
+                        category="DNS / Email Security",
+                        location=f"_dmarc.{self.host}",
+                        description=(
+                            f"The domain '{self.host}' publishes a DMARC policy with 'p=none' (monitoring mode). "
+                            "While DMARC reports are gathered, receiving mail servers will NOT reject or quarantine "
+                            "unauthenticated or spoofed emails, permitting phishing and BEC attacks."
+                        ),
+                        remediation=(
+                            f"Escalate DMARC policy from 'p=none' to 'p=quarantine' (quarantine unauthorized messages) "
+                            f"and eventually to 'p=reject' (strictly block all unauthenticated messages):\n"
+                            f"   'v=DMARC1; p=reject; rua=mailto:dmarc-reports@{self.host}; aspf=r;'"
+                        ),
+                        evidence=f"Published DMARC: {dmarc.get('raw', '')}",
+                        poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a{self.host}",
+                        reproduce_curl=f"nslookup -type=TXT _dmarc.{self.host}",
+                    ))
 
                 if not spf.get("has_spf"):
                     self._add_finding(AuditFinding(
@@ -306,6 +327,23 @@ class AutonomousAuditor:
                         poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=spf%3a{self.host}",
                         reproduce_curl=f"nslookup -type=TXT {self.host}",
                     ))
+                else:
+                    email_info = sec.get("email", {})
+                    spf_issues = email_info.get("spf", {}).get("issues", [])
+                    for spf_issue in spf_issues:
+                        is_crit = "Critical" in spf_issue or "PermError" in spf_issue
+                        self._add_finding(AuditFinding(
+                            title="RFC 7208 SPF PermError (Multiple SPF Records)" if "PermError" in spf_issue else "Insecure SPF Policy (+all)",
+                            severity="high" if is_crit else "medium",
+                            cvss_score=7.5 if is_crit else 5.0,
+                            category="DNS / Email Security",
+                            location=f"DNS TXT: {self.host}",
+                            description=spf_issue,
+                            remediation="Ensure only a single valid SPF record is published and replace permissive mechanisms with '-all' or '~all'.",
+                            evidence=f"Published SPF: {spf.get('raw', '')}",
+                            poc_url=f"https://mxtoolbox.com/SuperTool.aspx?action=spf%3a{self.host}",
+                            reproduce_curl=f"nslookup -type=TXT {self.host}",
+                        ))
 
                 # Check DNSSEC Cryptographic Zone Signing
                 dnssec = sec.get("dnssec", {})
@@ -632,19 +670,24 @@ class AutonomousAuditor:
 
                 # Check critical missing headers
                 for chk in header_results.get("checks", []):
-                    if not chk.get("secure") and chk.get("header") in ("Strict-Transport-Security", "Content-Security-Policy"):
-                        self._add_finding(AuditFinding(
-                            title=f"Missing Security Header ({chk.get('header')})",
-                            severity="low" if chk.get("header") == "Strict-Transport-Security" else "medium",
-                            cvss_score=3.7 if chk.get("header") == "Strict-Transport-Security" else 5.0,
-                            category="Web Defense / Headers",
-                            location=f"Response Headers: {chk.get('header')}",
-                            description=chk.get("description", "Security header is missing from server responses."),
-                            remediation=chk.get("recommendation", "Implement standard defense header in reverse proxy or web server configuration."),
-                            evidence=f"Header '{chk.get('header')}' was not returned.",
-                            poc_url=self.url,
-                            reproduce_curl=f"curl -I -k '{self.url}'",
-                        ))
+                    h_name = chk.get("header")
+                    if not chk.get("secure"):
+                        if h_name == "Strict-Transport-Security" and not self.url.lower().startswith("https://"):
+                            # RFC 6797: Plaintext HTTP cannot enforce HSTS. Do not flag as vulnerability.
+                            continue
+                        if h_name in ("Strict-Transport-Security", "Content-Security-Policy"):
+                            self._add_finding(AuditFinding(
+                                title=f"Missing Security Header ({h_name})",
+                                severity="low" if h_name == "Strict-Transport-Security" else "medium",
+                                cvss_score=3.7 if h_name == "Strict-Transport-Security" else 5.0,
+                                category="Web Defense / Headers",
+                                location=f"Response Headers: {h_name}",
+                                description=chk.get("description", "Security header is missing from server responses."),
+                                remediation=chk.get("recommendation", "Implement standard defense header in reverse proxy or web server configuration."),
+                                evidence=f"Header '{h_name}' was not returned.",
+                                poc_url=self.url,
+                                reproduce_curl=f"curl -I -k '{self.url}'",
+                            ))
             except Exception as e:
                 logger.debug(f"Stage 11 error: {e}")
         else:

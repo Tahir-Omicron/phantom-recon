@@ -306,6 +306,26 @@ class DNSEnumerator:
         except socket.gaierror:
             return False
 
+    @staticmethod
+    def get_organizational_domain(domain: str) -> str:
+        """
+        Extract organizational domain handling both standard and compound TLDs.
+        e.g. 'sub.example.com' -> 'example.com'
+             'sub.naa.edu.az' -> 'naa.edu.az'
+             'naa.edu.az' -> 'naa.edu.az'
+             'example.co.uk' -> 'example.co.uk'
+        """
+        parts = domain.lower().strip(".").split(".")
+        if len(parts) <= 2:
+            return domain
+
+        # Common compound second-level domains
+        COMPOUND_SLDS = {"edu", "gov", "co", "com", "org", "net", "mil", "ac", "biz"}
+        if len(parts) >= 3 and parts[-2] in COMPOUND_SLDS and len(parts[-1]) <= 3:
+            return ".".join(parts[-3:])
+
+        return ".".join(parts[-2:])
+
     def audit_email_security(self) -> dict[str, Any]:
         """
         Comprehensive DNS email security audit (SPF, DMARC, DKIM).
@@ -325,28 +345,38 @@ class DNSEnumerator:
 
         # 1. Query SPF (TXT records on base domain)
         txt_records = self._query_record("TXT")
+        spf_records_found = []
         for rec in txt_records:
             val = rec.get("value", "").strip("\"'")
-            if val.startswith("v=spf1"):
-                results["spf"]["present"] = True
-                results["spf"]["raw"] = val
-                parts = val.split()
-                all_mech = next((p for p in parts if p.endswith("all")), "")
-                if all_mech in ("+all", "all"):
-                    results["spf"]["policy"] = "+all"
-                    issue = "Critical: SPF has '+all' (permissive) — anyone can spoof emails as this domain!"
-                    results["spf"]["issues"].append(issue)
-                    results["issues"].append({"severity": "critical", "issue": issue})
-                elif all_mech == "?all":
-                    results["spf"]["policy"] = "?all"
-                    issue = "Warning: SPF has '?all' (neutral) — spoofed emails may not be marked as spam."
-                    results["spf"]["issues"].append(issue)
-                    results["issues"].append({"severity": "medium", "issue": issue})
-                elif all_mech == "~all":
-                    results["spf"]["policy"] = "~all (softfail)"
-                elif all_mech == "-all":
-                    results["spf"]["policy"] = "-all (hardfail/strict)"
-                break
+            if val.lower().startswith("v=spf1") or "v=spf1 " in val.lower():
+                spf_records_found.append(val)
+
+        if len(spf_records_found) > 1:
+            results["spf"]["present"] = True
+            results["spf"]["raw"] = "; ".join(spf_records_found)
+            issue = f"RFC 7208 PermError: Domain publishes {len(spf_records_found)} SPF records. Multiple SPF records invalidate email authentication!"
+            results["spf"]["issues"].append(issue)
+            results["issues"].append({"severity": "high", "issue": issue})
+        elif len(spf_records_found) == 1:
+            val = spf_records_found[0]
+            results["spf"]["present"] = True
+            results["spf"]["raw"] = val
+            parts = val.split()
+            all_mech = next((p for p in parts if p.endswith("all")), "")
+            if all_mech in ("+all", "all"):
+                results["spf"]["policy"] = "+all"
+                issue = "Critical: SPF has '+all' (permissive) — anyone can spoof emails as this domain!"
+                results["spf"]["issues"].append(issue)
+                results["issues"].append({"severity": "critical", "issue": issue})
+            elif all_mech == "?all":
+                results["spf"]["policy"] = "?all"
+                issue = "Warning: SPF has '?all' (neutral) — spoofed emails may not be marked as spam."
+                results["spf"]["issues"].append(issue)
+                results["issues"].append({"severity": "medium", "issue": issue})
+            elif all_mech == "~all":
+                results["spf"]["policy"] = "~all (softfail)"
+            elif all_mech == "-all":
+                results["spf"]["policy"] = "-all (hardfail/strict)"
 
         if not results["spf"]["present"]:
             issue = "Missing SPF record — domain lacks basic email sender authentication."
@@ -381,9 +411,9 @@ class DNSEnumerator:
         # Subdomain DMARC inheritance fallback (RFC 7489)
         # If subdomain lacks direct DMARC record, check parent organizational domain
         if not results["dmarc"]["present"]:
-            parts = self.domain.split(".")
-            if len(parts) > 2:
-                org_domain = ".".join(parts[-2:])
+            org_domain = self.get_organizational_domain(self.domain)
+            # Only inherit if this target is an actual subdomain of the organizational domain
+            if org_domain != self.domain and self.domain.endswith(f".{org_domain}"):
                 try:
                     org_dmarc = f"_dmarc.{org_domain}"
                     answers = self._resolve_query(org_dmarc, "TXT")
@@ -392,7 +422,6 @@ class DNSEnumerator:
                         if "v=DMARC1" in val:
                             sp_match = re.search(r"sp\s*=\s*([a-zA-Z]+)", val)
                             p_match = re.search(r"p\s*=\s*([a-zA-Z]+)", val)
-                            # Subdomain policy sp takes precedence; otherwise falls back to p
                             policy = sp_match.group(1).lower() if sp_match else (p_match.group(1).lower() if p_match else "none")
                             results["dmarc"]["present"] = True
                             results["dmarc"]["raw"] = f"{val} (inherited from {org_domain})"

@@ -88,22 +88,32 @@ class HeaderAnalyzer:
         headers = resp.headers
         self._checks = []
 
+        is_https = self.url.lower().startswith("https://")
+
         # ── Strict-Transport-Security ──
         hsts = headers.get("Strict-Transport-Security", "")
+        if is_https:
+            hsts_secure = bool(hsts and "max-age" in hsts.lower())
+            hsts_desc = (
+                "Enforces encrypted HTTPS connections via HSTS." if hsts
+                else "HTTP Strict-Transport-Security (HSTS) is missing on HTTPS service. Without HSTS, browsers can downgrade connections to plaintext HTTP, leaving sessions vulnerable to SSL stripping."
+            )
+            hsts_remedy = "" if hsts else "Nginx: add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always; | Apache: Header always set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\""
+            hsts_sev = "info" if hsts else "medium"
+        else:
+            hsts_secure = False
+            hsts_desc = "Target is accessed over unencrypted plaintext HTTP. HSTS cannot be enforced on plaintext HTTP (RFC 6797); enable HTTPS first."
+            hsts_remedy = "Deploy SSL/TLS and redirect all plaintext HTTP traffic to HTTPS before enforcing HSTS."
+            hsts_sev = "info"
+
         self._checks.append(HeaderCheck(
             header="Strict-Transport-Security",
             present=bool(hsts),
             value=hsts,
-            secure=bool(hsts and "max-age" in hsts.lower()),
-            description=(
-                "Enforces encrypted HTTPS connections via HSTS." if hsts
-                else "HTTP Strict-Transport-Security (HSTS) is missing. Without HSTS, browsers can downgrade connections to plaintext HTTP, leaving sessions vulnerable to SSL stripping and MitM interception."
-            ),
-            recommendation=(
-                "" if hsts
-                else "Nginx: add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always; | Apache: Header always set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\""
-            ),
-            severity="info" if hsts else "high",
+            secure=hsts_secure,
+            description=hsts_desc,
+            recommendation=hsts_remedy,
+            severity=hsts_sev,
         ))
 
         # ── Content-Security-Policy ──
@@ -142,22 +152,33 @@ class HeaderAnalyzer:
             severity="info" if xcto else "low",
         ))
 
-        # ── X-Frame-Options ──
+        # ── X-Frame-Options & Clickjacking Protection ──
         xfo = headers.get("X-Frame-Options", "")
+        has_csp_frame = "frame-ancestors" in csp.lower()
+        has_xfo = xfo.upper() in ("DENY", "SAMEORIGIN")
+        is_frame_protected = has_xfo or has_csp_frame
+
+        if has_csp_frame:
+            xfo_desc = "Clickjacking protection enforced via CSP 'frame-ancestors' directive (modern standard)."
+            xfo_remedy = ""
+            xfo_sev = "info"
+        elif has_xfo:
+            xfo_desc = f"Clickjacking protection enabled via X-Frame-Options ({xfo})."
+            xfo_remedy = ""
+            xfo_sev = "info"
+        else:
+            xfo_desc = "UI frame protection is absent (both X-Frame-Options and CSP frame-ancestors missing). The web application can be framed inside external websites, enabling clickjacking attacks."
+            xfo_remedy = "Nginx: add_header X-Frame-Options \"SAMEORIGIN\" always; (or configure CSP frame-ancestors 'self') | Apache: Header always set X-Frame-Options \"SAMEORIGIN\""
+            xfo_sev = "medium"
+
         self._checks.append(HeaderCheck(
             header="X-Frame-Options",
-            present=bool(xfo),
-            value=xfo,
-            secure=xfo.upper() in ("DENY", "SAMEORIGIN"),
-            description=(
-                f"Clickjacking protection enabled ({xfo})." if xfo
-                else "X-Frame-Options header is absent. The web application can be framed inside external websites, enabling UI redressing and clickjacking attacks."
-            ),
-            recommendation=(
-                "" if xfo
-                else "Nginx: add_header X-Frame-Options \"SAMEORIGIN\" always; (or DENY) | Apache: Header always set X-Frame-Options \"SAMEORIGIN\""
-            ),
-            severity="info" if xfo else "medium",
+            present=bool(xfo or has_csp_frame),
+            value=xfo or ("CSP: frame-ancestors" if has_csp_frame else ""),
+            secure=is_frame_protected,
+            description=xfo_desc,
+            recommendation=xfo_remedy,
+            severity=xfo_sev,
         ))
 
         # ── X-XSS-Protection ──

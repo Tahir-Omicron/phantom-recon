@@ -682,7 +682,9 @@ class VulnerabilityScanner:
         params = parse_qs(parsed.query)
 
         test_keys = list(params.keys()) if params else ["q", "search", "id", "keyword", "query"]
-        canary = "phantom<xss'probe\"789>"
+        import random, string
+        nonce = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+        canary = f"phntm{nonce}<xss'probe\"789>"
 
         for key in test_keys:
             test_query = dict(params)
