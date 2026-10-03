@@ -18,7 +18,7 @@ from phantom_recon.utils.logger import get_logger, console
 logger = get_logger(__name__)
 
 # DNS record types supported
-RECORD_TYPES = ["A", "AAAA", "MX", "NS", "TXT", "SOA", "CNAME", "SRV", "PTR", "CAA"]
+RECORD_TYPES = ["A", "AAAA", "MX", "NS", "TXT", "SOA", "CNAME", "SRV", "PTR", "CAA", "DNSKEY", "DS"]
 
 
 class DNSEnumerator:
@@ -47,6 +47,36 @@ class DNSEnumerator:
         self.timeout = timeout
         self._results: dict[str, Any] = {}
 
+    def _create_resolver(self, nameservers: Optional[list[str]] = None) -> Any:
+        """Create a configured dns.resolver.Resolver instance."""
+        import dns.resolver
+        resolver = dns.resolver.Resolver()
+        if nameservers:
+            resolver.nameservers = nameservers
+        elif self.nameserver:
+            resolver.nameservers = [self.nameserver]
+        resolver.timeout = self.timeout
+        resolver.lifetime = self.timeout
+        return resolver
+
+    def _resolve_query(self, domain: str, record_type: str) -> Any:
+        """
+        Execute a DNS query with automatic failover to high-reliability public resolvers
+        (1.1.1.1, 8.8.8.8, 9.9.9.9) on timeouts, gateway drops, or local server failure.
+        """
+        import dns.resolver
+        import dns.exception
+
+        resolver = self._create_resolver()
+        try:
+            return resolver.resolve(domain, record_type)
+        except (dns.resolver.Timeout, dns.resolver.NoNameservers, dns.exception.Timeout):
+            if not self.nameserver:
+                # Resilient public DNS resolvers fallback
+                fallback_resolver = self._create_resolver(nameservers=["1.1.1.1", "8.8.8.8", "9.9.9.9"])
+                return fallback_resolver.resolve(domain, record_type)
+            raise
+
     def _query_record(self, record_type: str) -> list[dict[str, str]]:
         """
         Query a specific DNS record type.
@@ -59,15 +89,7 @@ class DNSEnumerator:
         """
         records = []
         try:
-            import dns.resolver
-
-            resolver = dns.resolver.Resolver()
-            if self.nameserver:
-                resolver.nameservers = [self.nameserver]
-            resolver.timeout = self.timeout
-            resolver.lifetime = self.timeout
-
-            answers = resolver.resolve(self.domain, record_type)
+            answers = self._resolve_query(self.domain, record_type)
 
             for answer in answers:
                 record = {"type": record_type, "value": str(answer)}
@@ -143,6 +165,9 @@ class DNSEnumerator:
 
         duration = (datetime.now() - start).total_seconds()
 
+        email_sec = self.audit_email_security()
+        dnssec_sec = self.audit_dnssec()
+
         self._results = {
             "domain": self.domain,
             "nameserver": self.nameserver or "system default",
@@ -150,6 +175,20 @@ class DNSEnumerator:
             "duration": round(duration, 2),
             "records": results,
             "total_records": sum(len(v) for v in results.values()),
+            "security": {
+                "dmarc": {
+                    "has_dmarc": email_sec["dmarc"]["present"],
+                    "policy": email_sec["dmarc"].get("policy", "missing"),
+                    "raw": email_sec["dmarc"].get("raw", ""),
+                },
+                "spf": {
+                    "has_spf": email_sec["spf"]["present"],
+                    "policy": email_sec["spf"].get("policy", "missing"),
+                    "raw": email_sec["spf"].get("raw", ""),
+                },
+                "email": email_sec,
+                "dnssec": dnssec_sec,
+            },
         }
 
         return self._results
@@ -316,15 +355,8 @@ class DNSEnumerator:
 
         # 2. Query DMARC (_dmarc.<domain>)
         try:
-            import dns.resolver
-            resolver = dns.resolver.Resolver()
-            if self.nameserver:
-                resolver.nameservers = [self.nameserver]
-            resolver.timeout = self.timeout
-            resolver.lifetime = self.timeout
-
             dmarc_domain = f"_dmarc.{self.domain}"
-            answers = resolver.resolve(dmarc_domain, "TXT")
+            answers = self._resolve_query(dmarc_domain, "TXT")
             for ans in answers:
                 val = str(ans).strip("\"'")
                 if "v=DMARC1" in val:
@@ -353,15 +385,8 @@ class DNSEnumerator:
             if len(parts) > 2:
                 org_domain = ".".join(parts[-2:])
                 try:
-                    import dns.resolver
-                    resolver = dns.resolver.Resolver()
-                    if self.nameserver:
-                        resolver.nameservers = [self.nameserver]
-                    resolver.timeout = self.timeout
-                    resolver.lifetime = self.timeout
-
                     org_dmarc = f"_dmarc.{org_domain}"
-                    answers = resolver.resolve(org_dmarc, "TXT")
+                    answers = self._resolve_query(org_dmarc, "TXT")
                     for ans in answers:
                         val = str(ans).strip("\"'")
                         if "v=DMARC1" in val:
@@ -390,14 +415,10 @@ class DNSEnumerator:
         common_selectors = ["default", "google", "k1", "mail", "s1"]
         results["dkim_selectors_checked"] = common_selectors
         try:
-            import dns.resolver
-            resolver = dns.resolver.Resolver()
-            resolver.timeout = 2.0
-            resolver.lifetime = 2.0
             for sel in common_selectors:
                 dkim_domain = f"{sel}._domainkey.{self.domain}"
                 try:
-                    ans = resolver.resolve(dkim_domain, "TXT")
+                    ans = self._resolve_query(dkim_domain, "TXT")
                     for a in ans:
                         if "v=DKIM1" in str(a) or "p=" in str(a):
                             results["dkim_found"].append(sel)
@@ -406,5 +427,52 @@ class DNSEnumerator:
                     continue
         except Exception:
             pass
+
+        return results
+
+    def audit_dnssec(self) -> dict[str, Any]:
+        """
+        Comprehensive DNSSEC (Domain Name System Security Extensions) posture audit.
+        Validates presence of DNSKEY and DS records to prevent DNS cache poisoning
+        and rogue resolver redirection.
+
+        Returns:
+            Dictionary containing DNSSEC status, records found, and identified issues.
+        """
+        results: dict[str, Any] = {
+            "domain": self.domain,
+            "enabled": False,
+            "has_dnskey": False,
+            "has_ds": False,
+            "dnskey_records": [],
+            "ds_records": [],
+            "status": "Disabled",
+            "issues": [],
+        }
+
+        try:
+            dnskey = self._query_record("DNSKEY")
+            if dnskey:
+                results["has_dnskey"] = True
+                results["dnskey_records"] = [r.get("value", "") for r in dnskey]
+
+            ds = self._query_record("DS")
+            if ds:
+                results["has_ds"] = True
+                results["ds_records"] = [r.get("value", "") for r in ds]
+
+            if results["has_dnskey"] or results["has_ds"]:
+                results["enabled"] = True
+                results["status"] = "Enabled"
+            else:
+                results["status"] = "Disabled"
+                issue = (
+                    f"DNSSEC is not enabled for '{self.domain}'. "
+                    "Responses lack cryptographic verification against cache poisoning and BGP hijacking."
+                )
+                results["issues"].append(issue)
+        except Exception as e:
+            logger.debug(f"DNSSEC audit error for {self.domain}: {e}")
+            results["status"] = "Error"
 
         return results

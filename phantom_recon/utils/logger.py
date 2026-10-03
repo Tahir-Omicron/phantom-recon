@@ -78,11 +78,12 @@ BANNER = (
 
 def print_banner() -> None:
     """Print the Phantom Recon ASCII art banner."""
+    from phantom_recon import __version__
     console.print(BANNER)
     console.print(
         Panel(
             "[bold white]🔥 Advanced Penetration Testing & Reconnaissance Toolkit[/bold white]\n"
-            "[dim]📌 Version 2.1.0 | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
+            f"[dim]📌 Version {__version__} | Author: Tahir | License: MIT | Red Team & Defense[/dim]\n"
             "[dim yellow]⚠️  For authorized security testing & defensive posture assessment only[/dim yellow]",
             border_style="red",
             box=box.ROUNDED,
@@ -408,9 +409,16 @@ def format_poc_command(v: dict, fallback_target: str = "") -> str:
     cat = (v.get("category") or "").lower()
     title = (v.get("title") or "").lower()
 
-    # DNS / DMARC / SPF commands MUST use nslookup, NEVER curl!
-    if "dns" in cat or "email" in cat or "dmarc" in title or "spf" in title or "dmarc" in loc.lower() or "spf" in loc.lower():
-        if "dmarc" in title or "dmarc" in loc.lower():
+    # DNS / DMARC / SPF / DNSSEC commands MUST use nslookup, NEVER curl!
+    c_cmd = (v.get("reproduce_curl") or "").strip()
+    if c_cmd and c_cmd.startswith("nslookup "):
+        return c_cmd
+
+    if "dns" in cat or "email" in cat or "dmarc" in title or "spf" in title or "dnssec" in title or "dmarc" in loc.lower() or "spf" in loc.lower() or "dnssec" in loc.lower():
+        if "dnssec" in title or "dnssec" in loc.lower():
+            target_host = loc.replace("DNS Zone:", "").replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"") or fallback_target
+            return f"nslookup -type=DNSKEY {target_host}"
+        elif "dmarc" in title or "dmarc" in loc.lower():
             target_host = loc.replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"")
             if not target_host or target_host == fallback_target:
                 target_host = f"_dmarc.{fallback_target}"
@@ -418,7 +426,7 @@ def format_poc_command(v: dict, fallback_target: str = "") -> str:
                 target_host = f"_dmarc.{target_host.lstrip('.')}"
             return f"nslookup -type=TXT {target_host}"
         else:
-            target_host = loc.replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"")
+            target_host = loc.replace("DNS Zone:", "").replace("DNS TXT Record:", "").replace("DNS TXT:", "").replace("DNS:", "").strip(" '\"")
             if not target_host:
                 target_host = fallback_target
             return f"nslookup -type=TXT {target_host}"

@@ -248,6 +248,7 @@ class VulnerabilityScanner:
         user_agent: Optional[str] = None,
         verify_ssl: bool = False,
         skip_standalone_modules: bool = False,
+        follow_redirects: bool = True,
     ):
         """
         Initialize the vulnerability scanner.
@@ -258,11 +259,13 @@ class VulnerabilityScanner:
             user_agent: Custom User-Agent header.
             verify_ssl: Whether to verify SSL certificates.
             skip_standalone_modules: Whether to skip standalone modules already run in master pipeline.
+            follow_redirects: Whether to follow HTTP redirects.
         """
         self.url = url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.skip_standalone_modules = skip_standalone_modules
+        self.follow_redirects = follow_redirects
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": user_agent or (

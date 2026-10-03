@@ -349,8 +349,9 @@ def recon(ctx, url, full, tech, dirs):
 @click.option("--type", "record_type", default="all", help="Record types (all, a, mx, ns, txt, etc.).")
 @click.option("--zone-transfer", is_flag=True, help="Attempt zone transfer.")
 @click.option("--email", "email_audit", is_flag=True, help="Include SPF/DMARC email security audit.")
+@click.option("--dnssec", "dnssec_audit", is_flag=True, help="Include DNSSEC cryptographic posture audit.")
 @click.pass_context
-def dns(ctx, domain, record_type, zone_transfer, email_audit):
+def dns(ctx, domain, record_type, zone_transfer, email_audit, dnssec_audit):
     """📡 DNS record enumeration and anti-spoofing defense audit."""
     print_banner()
     section_header("DNS Enumeration")
@@ -362,6 +363,7 @@ def dns(ctx, domain, record_type, zone_transfer, email_audit):
     if record_type.lower() == "all":
         results = enumerator.enumerate_all()
         results["email_security"] = enumerator.audit_email_security()
+        results["dnssec"] = enumerator.audit_dnssec()
     else:
         types = [t.strip().upper() for t in record_type.split(",")]
         results = {"domain": domain, "records": {}}
@@ -371,6 +373,8 @@ def dns(ctx, domain, record_type, zone_transfer, email_audit):
                 results["records"][t] = records
         if email_audit:
             results["email_security"] = enumerator.audit_email_security()
+        if dnssec_audit:
+            results["dnssec"] = enumerator.audit_dnssec()
 
     if zone_transfer:
         zt_results = enumerator.check_zone_transfer()
@@ -394,6 +398,19 @@ def dns(ctx, domain, record_type, zone_transfer, email_audit):
             console.print(f"  • DMARC Policy:  [{d_color}]✓ {d_pol.upper()}[/{d_color}] ({dmarc.get('raw', '')[:60]})")
         else:
             console.print("  • DMARC Policy:  [bold red]✗ Missing (High Spoofing Risk)[/bold red]")
+
+    if "dnssec" in results:
+        dnssec = results["dnssec"]
+        console.print("\n[bold cyan]🔐 DNSSEC Cryptographic Integrity:[/bold cyan]")
+        if dnssec.get("enabled"):
+            console.print("  • Status:        [bold green]✓ Enabled & Cryptographically Signed[/bold green]")
+            if dnssec.get("dnskey_records"):
+                console.print(f"  • DNSKEY:        [green]{len(dnssec['dnskey_records'])} public key(s) published[/green]")
+            if dnssec.get("ds_records"):
+                console.print(f"  • DS:            [green]{len(dnssec['ds_records'])} delegation signer record(s) published[/green]")
+        else:
+            console.print("  • Status:        [bold red]✗ Disabled / Missing[/bold red]")
+            console.print("  • Impact:        [yellow]Unauthenticated DNS zone; vulnerable to cache poisoning & spoofing[/yellow]")
 
     _save_output(ctx, results)
 
